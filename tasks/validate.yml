@@ -88,21 +88,35 @@
           '{{ item.virtual_ipaddress | default('') }}' is not a valid IP address (with optional /prefix).
         success_msg: "VRRP instance {{ item.vrrp_instance_name }} virtual_ipaddress is valid"
 
-    - name: Validate proxy_hosts group for unicast mode
-      when: keepalived_unicast | default(true) | bool
+    - name: Validate peer group for unicast mode
+      when:
+        - keepalived_unicast | default(true) | bool
+        - keepalived_unicast_peers | length == 0
       ansible.builtin.assert:
         that:
-          - "'proxy_hosts' in groups"
-          - "groups['proxy_hosts'] | length >= 2"
+          - keepalived_peer_group in groups
+          - groups[keepalived_peer_group] | length >= 2
         fail_msg: |
-          keepalived_unicast is enabled but the 'proxy_hosts' inventory group is missing or has fewer than 2 hosts.
-          Unicast mode requires all load balancer nodes to be in the 'proxy_hosts' group for peer discovery.
+          keepalived_unicast is enabled but inventory group '{{ keepalived_peer_group }}'
+          is missing or has fewer than 2 hosts. Add both load balancer nodes to it,
+          or set keepalived_unicast_peers explicitly.
+        success_msg: "Peer group '{{ keepalived_peer_group }}' validated ({{ groups[keepalived_peer_group] | length }} hosts)"
 
-          Add to your inventory:
-            [proxy_hosts]
-            {{ loadbalancer_master }} ansible_host=<master_ip>
-            {{ loadbalancer_backup }} ansible_host=<backup_ip>
-        success_msg: "proxy_hosts group validated for unicast mode ({{ groups['proxy_hosts'] | length }} hosts)"
+    - name: Hard-assert each unicast peer has a resolvable interface IP
+      when:
+        - keepalived_unicast | default(true) | bool
+        - keepalived_unicast_peers | length == 0
+      loop: "{{ groups[keepalived_peer_group] | difference([inventory_hostname]) }}"
+      loop_control:
+        label: "{{ item }}"
+      ansible.builtin.assert:
+        that:
+          - hostvars[item]['ansible_facts'][keepalived_network_interface | replace('-', '_') | replace('.', '_')] is defined
+          - hostvars[item]['ansible_facts'][keepalived_network_interface | replace('-', '_') | replace('.', '_')]['ipv4']['address'] is defined
+        fail_msg: >-
+          No IPv4 address found on interface '{{ keepalived_network_interface }}' for peer
+          '{{ item }}'. Gather facts on all proxy hosts or set keepalived_unicast_peers.
+        success_msg: "Peer {{ item }} interface IP resolved"
 
     - name: Validate virtual_router_id uniqueness
       ansible.builtin.assert:
