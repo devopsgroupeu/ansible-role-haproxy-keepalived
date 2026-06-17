@@ -115,13 +115,11 @@ haproxy_ssl_default_bind_ciphersuites: "TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_S
 # Common options:
 #   - httplog: Enable HTTP request logging
 #   - dontlognull: Don't log connections with no data transferred
-#   - http-server-close: Enable HTTP close mode (one request per connection)
 #   - forwardfor except 127.0.0.0/8: Add X-Forwarded-For header (except from localhost)
 #   - redispatch: Allow session redispatch in case of connection failure
 haproxy_options:
   - httplog
   - dontlognull
-  - http-server-close
   - forwardfor except 127.0.0.0/8
   - redispatch
 

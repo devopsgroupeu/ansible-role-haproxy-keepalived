@@ -174,7 +174,6 @@ argument_specs:
         default:
           - httplog
           - dontlognull
-          - http-server-close
           - forwardfor except 127.0.0.0/8
           - redispatch
         description: HAProxy defaults-section option lines.

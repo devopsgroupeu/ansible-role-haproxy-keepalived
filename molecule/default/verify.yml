@@ -105,6 +105,17 @@
         success_msg: "Stats hardened: loopback bind, admin off"
 
     # ========================================================================
+    # HAP-24: http-server-close not in default options
+    # ========================================================================
+
+    - name: Verify http-server-close is not in default options
+      ansible.builtin.assert:
+        that:
+          - "'option http-server-close' not in (hap_cfg_stats.content | b64decode)"
+        fail_msg: "http-server-close should not be a default option"
+        success_msg: "http-server-close not present by default"
+
+    # ========================================================================
     # HAP-22: Hitless-reload prerequisites in global
     # ========================================================================
 
