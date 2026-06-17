@@ -11,7 +11,7 @@ galaxy_info:
   min_ansible_version: "2.19"
 
   role_name: haproxy_keepalived
-  namespace: devopsgroup
+  namespace: devopsgroupeu
 
   galaxy_tags:
     - loadbalancer
