@@ -15,25 +15,15 @@
     home: "{{ haproxy_socket_dir }}"
     create_home: false
 
-- name: Install Prerequisites on RHEL/CentOS/Rocky Linux
+- name: Install runtime prerequisites on RHEL/CentOS/Rocky Linux
   ansible.builtin.package:
     name:
-      - vim
-      - make
-      - gcc
-      - lua-devel
-      - openssl-devel
-      - libnl3-devel
-      - pcre2-devel
-      - zlib-devel
-      - net-snmp-devel
       - curl
-      - wget
       - python3
       - rsyslog
     state: present
   when:
-    - ansible_facts['distribution'] == "OracleLinux" or ansible_facts['distribution'] == "RedHat" or ansible_facts['distribution'] == "Rocky"
+    - ansible_facts['os_family'] == 'RedHat'
 
 - name: Update apt cache
   ansible.builtin.apt:
@@ -42,34 +32,21 @@
   when:
     - ansible_facts['distribution'] == "Debian" or ansible_facts['distribution'] == "Ubuntu"
 
-- name: Install Prerequisites on Debian/Ubuntu
+- name: Install runtime prerequisites on Debian/Ubuntu
   ansible.builtin.package:
     name:
-      - vim
-      - make
-      - build-essential
-      - gcc
-      - liblua5.4-dev
-      - libssl-dev
-      - libnl-3-dev
-      - libnl-genl-3-dev
-      - libsnmp-dev
-      - libpcre2-dev
-      - zlib1g-dev
       - curl
-      - wget
       - python3
       - rsyslog
     state: present
   when:
-    - ansible_facts['distribution'] == "Debian" or ansible_facts['distribution'] == "Ubuntu"
+    - ansible_facts['os_family'] == 'Debian'
 
-- name: Enabling Non-Local Binding
-  ansible.builtin.lineinfile:
-    path: /etc/sysctl.conf
-    line: net.ipv4.ip_nonlocal_bind=1
-
-- name: For the kernel to pick up the new changes without rebooting
-  ansible.builtin.command:
-    cmd: sysctl -p
-  changed_when: false
+- name: Enable non-local binding for the VIP
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_nonlocal_bind
+    value: "1"
+    sysctl_file: /etc/sysctl.d/60-keepalived.conf
+    sysctl_set: true
+    reload: true
+    state: present

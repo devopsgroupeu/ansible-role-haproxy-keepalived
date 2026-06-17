@@ -40,3 +40,29 @@
         name: systemd-journald
         state: started
       become: true
+
+- name: Prepare proxy hosts for keepalived package install
+  hosts: proxy_hosts
+  become: true
+  gather_facts: false
+  tasks:
+    # The packaged keepalived uses Type=notify which fails in Docker containers
+    # because child processes cannot send sd_notify to the socket. Override to
+    # Type=simple so the service starts cleanly in the molecule container env.
+    - name: Create keepalived systemd drop-in directory (prepare)
+      ansible.builtin.file:
+        path: /etc/systemd/system/keepalived.service.d
+        state: directory
+        mode: "0755"
+
+    - name: Override keepalived service type to forking for Docker (prepare)
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/keepalived.service.d/docker-compat.conf
+        content: |
+          [Service]
+          Type=forking
+        mode: "0644"
+
+    - name: Reload systemd daemon (prepare)
+      ansible.builtin.systemd_service:
+        daemon_reload: true
