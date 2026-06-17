@@ -141,8 +141,14 @@ haproxy_timeout_check: 10s             # Max time for health check completion
 # Also exposes Prometheus metrics at /metrics endpoint
 haproxy_stats: true
 haproxy_stats_port: 1936
-haproxy_stats_bind_addr: "0.0.0.0"  # Bind to all interfaces; use "127.0.0.1" for localhost only
+# ⚠️  Bind to loopback by default. Stats/metrics expose backend topology; only
+# widen this if the port is firewalled or behind an authenticated reverse proxy.
+haproxy_stats_bind_addr: "127.0.0.1"
 haproxy_stats_page_uri: "/haproxy/stats"
+
+# ⚠️  Stats admin enables LIVE backend control (enable/disable servers, drain)
+# from the stats UI behind only basic auth. Off by default; opt in explicitly.
+haproxy_stats_admin: false
 
 # ⚠️  SECURITY WARNING: Change default credentials before production deployment!
 # Default credentials are INTENTIONALLY WEAK and will trigger validation errors

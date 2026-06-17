@@ -215,10 +215,17 @@ argument_specs:
         required: false
         default: 1936
         description: Stats page port.
+      haproxy_stats_admin:
+        type: bool
+        required: false
+        default: false
+        description: >-
+          Enable the stats admin interface (live backend enable/disable).
+          Off by default; basic auth is the only protection when enabled.
       haproxy_stats_bind_addr:
         type: str
         required: false
-        default: "0.0.0.0"
+        default: "127.0.0.1"
         description: Stats page bind address.
       haproxy_stats_page_user:
         type: str

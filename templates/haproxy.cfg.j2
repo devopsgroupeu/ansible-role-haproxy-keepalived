@@ -43,7 +43,9 @@ listen stats
     stats uri {{ haproxy_stats_page_uri }}
     stats realm Haproxy
     stats show-modules
+{% if haproxy_stats_admin | bool %}
     stats admin if TRUE
+{% endif %}
 {% endif %}
 
 {% for frontend in haproxy_frontends %}

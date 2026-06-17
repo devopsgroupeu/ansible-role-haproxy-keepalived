@@ -88,6 +88,23 @@
       delay: 2
 
     # ========================================================================
+    # HAP-21: Stats bound to loopback, admin off by default
+    # ========================================================================
+
+    - name: Read rendered HAProxy config
+      ansible.builtin.slurp:
+        src: /etc/haproxy/haproxy.cfg
+      register: hap_cfg_stats
+
+    - name: Verify stats are admin-locked and bound to loopback by default
+      ansible.builtin.assert:
+        that:
+          - "'stats admin if TRUE' not in (hap_cfg_stats.content | b64decode)"
+          - "'bind 127.0.0.1:1936' in (hap_cfg_stats.content | b64decode)"
+        fail_msg: "Stats listen must default to 127.0.0.1 and must not enable admin"
+        success_msg: "Stats hardened: loopback bind, admin off"
+
+    # ========================================================================
     # HAP-16: Source-specific build deps absent in package mode
     # Note: the geerlingguy base image ships gcc/build-essential pre-installed.
     # We assert the role-specific source deps (liblua5.4-dev, libpcre2-dev)
