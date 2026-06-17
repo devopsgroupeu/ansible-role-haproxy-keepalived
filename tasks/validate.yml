@@ -144,6 +144,17 @@
           Duplicate IDs detected: {{ keepalived_vrrp_instances | map(attribute='virtual_router_id') | list }}
         success_msg: "All virtual_router_id values are unique"
 
+    - name: Validate failover invariant (no positive track-script weight)
+      ansible.builtin.assert:
+        that:
+          - keepalived_haproxy_check_weight is not defined
+        fail_msg: |
+          keepalived_haproxy_check_weight is set, but this role uses clean
+          FAULT-on-failure (no weight) so the VIP always migrates when HAProxy
+          dies. A positive weight defeats failover; a negative weight is not
+          supported here. Remove keepalived_haproxy_check_weight.
+        success_msg: "Failover invariant satisfied (track script uses FAULT-on-failure)"
+
 - name: Display configuration summary
   ansible.builtin.debug:
     msg:

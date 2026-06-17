@@ -8,7 +8,6 @@ vrrp_script haproxy_check {
   script "service haproxy status"
   timeout 2
   interval 2
-  weight 2
   fall 2
   rise 2
 }

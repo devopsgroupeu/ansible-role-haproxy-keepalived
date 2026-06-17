@@ -119,6 +119,60 @@
       register: keepalived_syntax_check
       failed_when: keepalived_syntax_check.rc != 0
 
+    - name: Read generated keepalived.conf
+      ansible.builtin.slurp:
+        src: /etc/keepalived/keepalived.conf
+      register: keepalived_conf_raw
+
+    - name: Assert vrrp_script has no positive weight (KV-1 failover invariant)
+      ansible.builtin.assert:
+        that:
+          - "'weight' not in (keepalived_conf_raw.content | b64decode)"
+        fail_msg: >-
+          keepalived.conf contains a 'weight' directive on the track script;
+          a positive weight defeats failover (master keeps VIP when HAProxy dies).
+        success_msg: "vrrp_script uses clean FAULT-on-failure (no weight)"
+
+    - name: Count running keepalived processes
+      ansible.builtin.command: pgrep -x keepalived
+      register: keepalived_pids
+      changed_when: false
+
+    - name: Assert keepalived drop-in sets the log facility (no --log-facility command)
+      ansible.builtin.stat:
+        path: /etc/systemd/system/keepalived.service.d/override.conf
+      register: keepalived_dropin
+
+    - name: Verify single keepalived process group and drop-in present
+      ansible.builtin.assert:
+        that:
+          - keepalived_dropin.stat.exists
+        fail_msg: "keepalived log facility not set via systemd drop-in"
+        success_msg: "keepalived facility set via drop-in; no stray daemon"
+
+    - name: Assert Reload handlers are defined in the role
+      ansible.builtin.command: >-
+        grep -q "Reload haproxy" {{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/handlers/main.yml
+      delegate_to: localhost
+      run_once: true
+      changed_when: false
+      register: reload_handler_grep
+      failed_when: reload_handler_grep.rc != 0
+
+    - name: Read HAProxy rsyslog config
+      ansible.builtin.slurp:
+        src: /etc/rsyslog.d/haproxy.conf
+      register: haproxy_rsyslog_raw
+
+    - name: Assert rsyslog captures the configured HAProxy facility
+      ansible.builtin.assert:
+        that:
+          - "'local2.' in (haproxy_rsyslog_raw.content | b64decode)"
+        fail_msg: >-
+          rsyslog captures a facility that does not match haproxy_log_facility
+          (local2); HAProxy logs are silently dropped.
+        success_msg: "rsyslog captures the configured HAProxy facility"
+
     # ========================================================================
     # Directory and File Permissions
     # ========================================================================
