@@ -20,7 +20,6 @@
 - name: Configure cloud Floating IP API integration
   ansible.builtin.import_tasks: cloud_floating_ip.yml
   when:
-    - keepalived_enabled | bool
     - cloud_floating_ip_enabled | bool
   tags:
     - keepalived

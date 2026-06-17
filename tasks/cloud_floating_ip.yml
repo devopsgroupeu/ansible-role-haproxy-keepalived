@@ -29,6 +29,15 @@
     state: present
   become: true
 
+- name: Ensure keepalived config directory exists (cloud-only mode)
+  ansible.builtin.file:
+    path: "{{ keepalived_config_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+
 - name: Deploy cloud Floating IP credentials env file
   ansible.builtin.copy:
     dest: "{{ keepalived_config_dir }}/cloud-floating-ip.env"

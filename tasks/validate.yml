@@ -138,6 +138,17 @@
           supported here. Remove keepalived_haproxy_check_weight.
         success_msg: "Failover invariant satisfied (track script uses FAULT-on-failure)"
 
+    - name: Validate VRRP auth - password required when auth type is set
+      when: keepalived_auth_type | default('') | length > 0
+      ansible.builtin.assert:
+        that:
+          - keepalived_auth_pass | default('') | length > 0
+        fail_msg: |
+          keepalived_auth_type is set to '{{ keepalived_auth_type }}' but
+          keepalived_auth_pass is empty. Set keepalived_auth_pass (store in
+          Ansible Vault: vault_keepalived_auth_pass).
+        success_msg: "VRRP auth credentials validated"
+
 - name: Display configuration summary
   ansible.builtin.debug:
     msg:
