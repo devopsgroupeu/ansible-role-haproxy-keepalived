@@ -100,6 +100,9 @@
       register: haproxy_compile
       changed_when: haproxy_compile.rc == 0
 
+    # Idempotency: this task runs only inside the haproxy_installation_required
+    # block and is further guarded by the compile `creates:` guard above, so
+    # no additional `when: haproxy_compile is changed` guard is needed here.
     - name: Install HAProxy binaries
       ansible.builtin.command:
         cmd: make install
@@ -133,3 +136,4 @@
     state: absent
   when:
     - haproxy_remove_build_deps | bool
+    - haproxy_compile is defined and haproxy_compile is changed

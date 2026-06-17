@@ -28,6 +28,102 @@ argument_specs:
         required: false
         default: "3.4.0"
         description: HAProxy source version (used only when haproxy_install_method=source).
+      haproxy_install_method:
+        type: str
+        required: false
+        default: package
+        choices: [package, source]
+        description: >
+          Installation method for HAProxy. 'package' (default) installs from the
+          distro/PPA repository; 'source' compiles from the official tarball.
+      haproxy_branch:
+        type: str
+        required: false
+        default: ""
+        description: >
+          Optional repo branch for package mode (e.g. "3.0" or "3.4"). Selects
+          the vbernat PPA (Ubuntu) or haproxy.debian.net backport (Debian) for
+          that branch. Empty = use the distribution's default HAProxy package.
+      haproxy_binary:
+        type: str
+        required: false
+        default: "{{ '/usr/local/sbin/haproxy' if haproxy_install_method == 'source' else '/usr/sbin/haproxy' }}"
+        description: >
+          Absolute path to the haproxy binary. Automatically set based on
+          haproxy_install_method; override only if your distro places it elsewhere.
+      haproxy_make_flags_default:
+        type: list
+        elements: str
+        required: false
+        default:
+          - "TARGET=linux-glibc"
+          - "USE_OPENSSL=1"
+          - "USE_PCRE2=1"
+          - "USE_LUA=1"
+          - "USE_SLZ=1"
+          - "USE_SYSTEMD=1"
+          - "USE_PROMEX=1"
+          - "USE_PCRE2_JIT=1"
+        description: >
+          Base set of make flags for source-mode HAProxy builds. This is the
+          baseline; haproxy_make_flags is the override point where QUIC flags
+          are appended conditionally. Override haproxy_make_flags to fully
+          customize the build without touching this base.
+      haproxy_make_flags:
+        type: raw
+        required: false
+        default: "{{ haproxy_make_flags_default + (['USE_QUIC=1', 'USE_QUIC_OPENSSL_COMPAT=1'] if haproxy_version is version('2.9', '>=') else []) }}"
+        description: >
+          Final list of make flags passed to the HAProxy build. Defaults to
+          haproxy_make_flags_default plus QUIC flags on HAProxy >= 2.9.
+          Override this var (not haproxy_make_flags_default) to fully replace
+          the flag set.
+      haproxy_src_sha256:
+        type: str
+        required: false
+        default: ""
+        description: >
+          SHA256 checksum for the HAProxy source tarball; required when
+          haproxy_install_method=source. Accepts "sha256:<hex>" or a remote
+          ".sha256" URL. haproxy.org publishes a sidecar checksum file next
+          to each release tarball.
+      haproxy_remove_build_deps:
+        type: bool
+        required: false
+        default: false
+        description: >
+          Purge the HAProxy build toolchain (gcc, make, etc.) after a source
+          install to save space and reduce attack surface. Only effective in
+          source mode.
+      haproxy_offline_install:
+        type: bool
+        required: false
+        default: false
+        description: >
+          When true, copy a pre-staged tarball from the Ansible controller
+          (haproxy_src_local_path) instead of downloading from haproxy.org.
+          Use for air-gapped environments.
+      haproxy_src_local_path:
+        type: str
+        required: false
+        default: ""
+        description: >
+          Path on the Ansible controller to a pre-staged HAProxy source tarball.
+          Only used when haproxy_offline_install=true.
+      haproxy_ssl_cert_src:
+        type: str
+        required: false
+        default: ""
+        description: >
+          Path on the Ansible controller to a directory of SSL certificates to
+          deploy into {{ haproxy_config_dir }}/certs/. Empty = no certs deployed.
+      haproxy_install_dir:
+        type: str
+        required: false
+        default: /usr/local/src
+        description: >
+          Directory on the target host where HAProxy and Keepalived source
+          tarballs are downloaded and compiled (source mode only).
       haproxy_config:
         type: str
         required: false
@@ -178,11 +274,6 @@ argument_specs:
         required: false
         default: /var/lib/haproxy
         description: HAProxy runtime/chroot directory.
-      install_dir:
-        type: str
-        required: false
-        default: /usr/local/src
-        description: Directory where HAProxy and Keepalived source tarballs are built (source mode).
       keepalived_enabled:
         type: bool
         required: false
@@ -193,6 +284,58 @@ argument_specs:
         required: false
         default: "2.3.4"
         description: Keepalived source version (used only when keepalived_install_method=source).
+      keepalived_src_sha256:
+        type: str
+        required: false
+        default: ""
+        description: >
+          SHA256 checksum for the Keepalived source tarball; required when
+          keepalived_install_method=source. Accepts "sha256:<hex>" or a remote
+          ".sha256" URL.
+      keepalived_install_method:
+        type: str
+        required: false
+        default: package
+        choices: [package, source]
+        description: >
+          Installation method for Keepalived. 'package' (default) installs from
+          the distro repository; 'source' compiles from the official tarball.
+      keepalived_binary:
+        type: str
+        required: false
+        default: "{{ '/usr/local/sbin/keepalived' if keepalived_install_method == 'source' else '/usr/sbin/keepalived' }}"
+        description: >
+          Absolute path to the keepalived binary. Automatically set based on
+          keepalived_install_method; override only if your distro places it elsewhere.
+      keepalived_configure_flags_default:
+        type: list
+        elements: str
+        required: false
+        default:
+          - "--with-init=systemd"
+          - "--enable-snmp"
+          - "--enable-bfd"
+        description: >
+          Base set of ./configure flags for source-mode Keepalived builds. This is
+          the baseline; keepalived_configure_flags is the override point. Override
+          keepalived_configure_flags (not this var) to fully replace the flag set.
+      keepalived_configure_flags:
+        type: list
+        elements: str
+        required: false
+        default: "{{ keepalived_configure_flags_default }}"
+        description: >
+          Final list of ./configure flags passed to the Keepalived build. Defaults
+          to keepalived_configure_flags_default. Override this var to fully replace
+          the configure flag set.
+      keepalived_remove_build_deps:
+        type: raw
+        required: false
+        default: "{{ haproxy_remove_build_deps }}"
+        description: >
+          Purge the Keepalived build toolchain (gcc, make, etc.) after a source
+          install. Defaults to the value of haproxy_remove_build_deps for back-compat.
+          Override independently if you compile only one component from source.
       keepalived_log_facility:
         type: str
         required: false

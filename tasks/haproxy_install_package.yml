@@ -27,6 +27,17 @@
     - ansible_facts['distribution'] == 'Debian'
     - haproxy_branch | length > 0
 
+- name: Pin haproxy.debian.net branch package (Debian, ensures branch is preferred)
+  ansible.builtin.template:
+    src: haproxy-debian-pin.pref.j2
+    dest: "/etc/apt/preferences.d/haproxy-{{ haproxy_branch }}.pref"
+    owner: root
+    group: root
+    mode: "0644"
+  when:
+    - ansible_facts['distribution'] == 'Debian'
+    - haproxy_branch | length > 0
+
 - name: Install HAProxy (Debian/Ubuntu)
   ansible.builtin.apt:
     name: haproxy

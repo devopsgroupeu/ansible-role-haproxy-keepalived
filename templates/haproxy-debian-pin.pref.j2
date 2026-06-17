@@ -1,0 +1,3 @@
+Package: haproxy
+Pin: release o=haproxy.debian.net,n={{ ansible_facts['distribution_release'] }}-backports-{{ haproxy_branch }}
+Pin-Priority: 600

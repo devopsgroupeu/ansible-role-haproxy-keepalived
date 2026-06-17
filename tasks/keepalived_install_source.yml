@@ -115,4 +115,5 @@
       - make
     state: absent
   when:
-    - haproxy_remove_build_deps | bool
+    - keepalived_remove_build_deps | bool
+    - keepalived_compile is defined and keepalived_compile is changed

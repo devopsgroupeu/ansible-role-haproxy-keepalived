@@ -71,9 +71,14 @@ haproxy_make_flags: >-
   {{ haproxy_make_flags_default + (['USE_QUIC=1', 'USE_QUIC_OPENSSL_COMPAT=1']
      if haproxy_version is version('2.9', '>=') else []) }}
 
-# Purge the build toolchain after a source install (saves space, reduces LB
-# attack surface). Only effective in source mode.
+# Purge the HAProxy build toolchain after a source install (saves space, reduces
+# LB attack surface). Only effective in source mode.
 haproxy_remove_build_deps: false
+
+# Purge the Keepalived build toolchain after a source install. Defaults to the
+# same value as haproxy_remove_build_deps so existing callers need no change.
+# Override independently if you compile only one component from source.
+keepalived_remove_build_deps: "{{ haproxy_remove_build_deps }}"
 
 # Offline/air-gapped source install: copy a pre-staged tarball from the
 # controller instead of downloading from haproxy.org.
