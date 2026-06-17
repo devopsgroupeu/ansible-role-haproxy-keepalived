@@ -80,7 +80,7 @@
       ansible.builtin.uri:
         url: http://localhost:1936/haproxy/stats
         user: admin
-        password: test_password_123
+        password: "{{ haproxy_stats_page_pass }}"
         force_basic_auth: true
         status_code: 200
       register: stats_check

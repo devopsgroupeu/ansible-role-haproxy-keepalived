@@ -5,6 +5,8 @@ driver:
   name: docker
 platforms:
   # Master proxy node
+  # privileged + CAP_NET_ADMIN required: keepalived binds/unbinds the VRRP VIP
+  # on the interface. Without privileged mode, ip addr add fails inside Docker.
   - name: proxy-master
     image: geerlingguy/docker-${MOLECULE_DISTRO:-ubuntu2404}-ansible:latest
     command: ""
@@ -14,7 +16,10 @@ platforms:
     privileged: true
     pre_build_image: true
     networks:
-      - name: molecule-network
+      # NOTE: VIP 172.18.0.100 assumes molecule-default-net on the default docker
+      # bridge subnet (172.18.0.0/16). Adjust the VIP if your docker net differs.
+      # Isolated per-scenario network prevents teardown collision with other scenarios.
+      - name: molecule-default-net
     groups:
       - proxy_hosts
 
@@ -28,7 +33,7 @@ platforms:
     privileged: true
     pre_build_image: true
     networks:
-      - name: molecule-network
+      - name: molecule-default-net
     groups:
       - proxy_hosts
 
@@ -42,7 +47,7 @@ platforms:
     privileged: true
     pre_build_image: true
     networks:
-      - name: molecule-network
+      - name: molecule-default-net
     groups:
       - backend_servers
 
@@ -56,71 +61,10 @@ provisioner:
     ssh_connection:
       pipelining: false
   inventory:
-    group_vars:
-      all:
-        haproxy_loadbalancer_master: "proxy-master"
-        haproxy_loadbalancer_backup: "proxy-backup"
-        haproxy_enabled: true
-        haproxy_version: "3.4.0"
-        haproxy_stats: true
-        haproxy_stats_page_pass: "test_password_123"
-        keepalived_enabled: true
-        keepalived_version: "2.3.4"
-        keepalived_network_interface: eth0
-        keepalived_peer_group: proxy_hosts
-        keepalived_nopreempt: true
-        keepalived_advert_int: 2
-        keepalived_garp_master_delay: 5
-        keepalived_vrrp_instances:
-          - vrrp_instance_name: VI_TEST
-            virtual_ipaddress: "172.18.0.100"
-            virtual_router_id: 51
-          - vrrp_instance_name: VI_TEST2
-            virtual_ipaddress: "172.18.0.101"
-            virtual_router_id: 52
-        keepalived_sync_groups:
-          - name: SG_TEST
-            instances:
-              - VI_TEST
-              - VI_TEST2
-        haproxy_frontends:
-          - name: test_http_frontend
-            address: "*"
-            port: 8080
-            default_backend: test_backend
-            mode: http
-            acls:
-              - "is_health path /healthz"
-            use_backends:
-              - backend: test_backend
-                condition: "if is_health"
-            http_request_rules:
-              - "set-header X-Test 1"
-            http_response_rules:
-              - "set-header X-Frame-Options DENY"
-        haproxy_backends:
-          - name: test_backend
-            balance: roundrobin
-            mode: http
-            servers:
-              - backend1
-            port: 80
-            options:
-              - check
-        haproxy_global_extra: |
-          tune.ssl.default-dh-param 2048
-        haproxy_custom_sections: |
-          peers mypeers
-            peer proxy-master 172.18.0.2:1024
-        haproxy_errorfiles:
-          - code: 503
-            path: /etc/haproxy/errors/503.http
-        haproxy_resolvers:
-          - name: dns
-            nameservers:
-              - "ns1 127.0.0.1:53"
-        keepalived_auth_type: PASS
-        keepalived_auth_pass: "vrrpsec"
+    # Fixture variables live in molecule/default/group_vars/all.yml (DRY).
+    # The links key symlinks group_vars/ into molecule's ephemeral inventory dir.
+    links:
+      group_vars: group_vars
 
 verifier:
   name: ansible

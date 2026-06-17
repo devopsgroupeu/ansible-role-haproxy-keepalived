@@ -13,7 +13,8 @@ platforms:
     privileged: true
     pre_build_image: true
     networks:
-      - name: molecule-network
+      # Isolated per-scenario network prevents teardown collision with other scenarios.
+      - name: molecule-ssl-net
     groups:
       - proxy_hosts
 provisioner:
