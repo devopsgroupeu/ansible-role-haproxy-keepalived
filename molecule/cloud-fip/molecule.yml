@@ -1,0 +1,72 @@
+---
+dependency:
+  name: galaxy
+driver:
+  name: docker
+platforms:
+  # Single node sufficient for cloud-fip testing - keepalived is disabled,
+  # only the HAProxy install + cloud-fip notify script/env/unit deployment is tested.
+  # privileged: true required for systemd operation inside Docker.
+  - name: fip-node
+    image: geerlingguy/docker-${MOLECULE_DISTRO:-ubuntu2404}-ansible:latest
+    command: ""
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cgroupns_mode: host
+    privileged: true
+    pre_build_image: true
+    networks:
+      # Isolated per-scenario network; prevents teardown collision with other scenarios.
+      - name: molecule-cloudfip-net
+    groups:
+      - proxy_hosts
+
+provisioner:
+  name: ansible
+  config_options:
+    defaults:
+      interpreter_python: auto_silent
+    ssh_connection:
+      pipelining: false
+  inventory:
+    group_vars:
+      all:
+        haproxy_loadbalancer_master: "fip-node"
+        haproxy_loadbalancer_backup: "fip-node-b"
+        haproxy_install_method: package
+        keepalived_install_method: package
+        keepalived_enabled: false
+        haproxy_stats_page_pass: "test_password_123456"
+        haproxy_frontends:
+          - name: fe
+            address: "127.0.0.1"
+            port: 8080
+            default_backend: be
+            mode: http
+        haproxy_backends:
+          - name: be
+            mode: http
+            servers:
+              - name: app1
+                address: 127.0.0.1
+                port: 9
+        cloud_floating_ip_enabled: true
+        cloud_api_token: "test-token"
+        cloud_floating_ip_address: "203.0.113.10"
+        cloud_api_endpoint: "http://127.0.0.1:8088/v1"
+        cloud_floating_ip_interface: "eth0"
+
+verifier:
+  name: ansible
+
+scenario:
+  test_sequence:
+    - dependency
+    - destroy
+    - syntax
+    - create
+    - prepare
+    - converge
+    - idempotence
+    - verify
+    - destroy

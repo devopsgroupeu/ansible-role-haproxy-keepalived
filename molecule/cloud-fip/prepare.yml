@@ -1,0 +1,86 @@
+---
+- name: Prepare cloud-fip mock API
+  hosts: all
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Fix PAM authentication for Rocky Linux
+      ansible.builtin.lineinfile:
+        path: /etc/pam.d/su
+        regexp: '^account\s+required\s+pam_access.so'
+        state: absent
+      when: ansible_os_family == 'RedHat'
+      failed_when: false
+
+    - name: Install python3 and iproute2 (Debian/Ubuntu)
+      ansible.builtin.package:
+        name:
+          - python3
+          - iproute2
+        state: present
+      when: ansible_os_family == 'Debian'
+
+    - name: Install python3 and iproute (Rocky/RHEL)
+      ansible.builtin.package:
+        name:
+          - python3
+          - iproute
+        state: present
+      when: ansible_os_family == 'RedHat'
+
+    - name: Ensure systemd-journald is running
+      ansible.builtin.service:
+        name: systemd-journald
+        state: started
+
+    - name: Deploy mock Hetzner API responder
+      ansible.builtin.copy:
+        dest: /usr/local/bin/mock-hetzner-api.py
+        mode: "0755"
+        content: |
+          #!/usr/bin/env python3
+          import json
+          from http.server import BaseHTTPRequestHandler, HTTPServer
+
+          class H(BaseHTTPRequestHandler):
+              def _send(self, obj):
+                  self.send_response(200)
+                  self.send_header("Content-Type", "application/json")
+                  self.end_headers()
+                  self.wfile.write(json.dumps(obj).encode())
+
+              def do_GET(self):
+                  if "/servers" in self.path:
+                      self._send({"servers": [{"id": 1, "name": "fip-node"}]})
+                  elif "/floating_ips" in self.path:
+                      self._send({"floating_ips": [{"id": 99, "ip": "203.0.113.10"}]})
+                  else:
+                      self._send({})
+
+              def do_POST(self):
+                  self._send({"action": {"id": 1, "status": "running"}})
+
+              def log_message(self, *a):
+                  return
+
+          HTTPServer(("127.0.0.1", 8088), H).serve_forever()
+
+    - name: Deploy mock API systemd unit
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/mock-hetzner-api.service
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=Mock Hetzner API
+          [Service]
+          ExecStart=/usr/bin/python3 /usr/local/bin/mock-hetzner-api.py
+          Restart=always
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Start mock API
+      ansible.builtin.systemd_service:
+        name: mock-hetzner-api
+        state: started
+        enabled: true
+        daemon_reload: true

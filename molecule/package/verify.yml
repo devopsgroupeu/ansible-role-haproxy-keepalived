@@ -1,0 +1,53 @@
+---
+- name: Verify package-mode install
+  hosts: proxy_hosts
+  become: true
+  gather_facts: true
+  tasks:
+    - name: HAProxy binary present and executable
+      ansible.builtin.command: haproxy -v
+      register: hap_v
+      changed_when: false
+      failed_when: hap_v.rc != 0
+
+    - name: Gather service facts
+      ansible.builtin.service_facts:
+
+    - name: Assert haproxy and keepalived are active
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.services['haproxy.service'].state == 'running'
+          - ansible_facts.services['keepalived.service'].state == 'running'
+        fail_msg: "Package-mode services not running"
+        success_msg: "Package-mode HAProxy + Keepalived running"
+
+    # The geerlingguy test image ships with gcc pre-installed.
+    # We check for source-specific build deps (liblua5.4-dev, libpcre2-dev)
+    # that the role installs only in source mode — those prove no source path leaked.
+    - name: Check for liblua5.4-dev (source-only HAProxy build dep, Debian/Ubuntu)
+      ansible.builtin.command: dpkg -s liblua5.4-dev
+      register: lua_dev_pkg
+      changed_when: false
+      failed_when: false
+      when: ansible_os_family == 'Debian'
+
+    - name: Assert source-specific build deps absent in package mode (Debian/Ubuntu)
+      ansible.builtin.assert:
+        that:
+          - lua_dev_pkg.rc != 0
+        fail_msg: "liblua5.4-dev present in package mode (source build deps leaked)"
+        success_msg: "Source-specific build deps absent in package mode"
+      when: ansible_os_family == 'Debian'
+
+    - name: Validate HAProxy configuration syntax
+      ansible.builtin.command: haproxy -c -f /etc/haproxy/haproxy.cfg
+      changed_when: false
+      register: hap_syntax
+      failed_when: hap_syntax.rc != 0
+
+    - name: Assert HAProxy configuration is valid
+      ansible.builtin.assert:
+        that:
+          - hap_syntax.rc == 0
+        fail_msg: "HAProxy configuration syntax invalid in package mode"
+        success_msg: "HAProxy configuration valid in package mode"

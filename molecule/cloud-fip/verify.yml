@@ -1,0 +1,45 @@
+---
+- name: Verify cloud-fip convergence
+  hosts: proxy_hosts
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Read deployed notify script
+      ansible.builtin.slurp:
+        src: /usr/local/bin/cloud-floating-ip-notify.sh
+      register: fip_script
+
+    - name: Stat env file
+      ansible.builtin.stat:
+        path: /etc/keepalived/cloud-floating-ip.env
+      register: fip_env
+
+    - name: Stat systemd unit
+      ansible.builtin.stat:
+        path: /etc/systemd/system/cloud-floating-ip.service
+      register: fip_unit
+
+    - name: Assert FIP convergence (credential-free script, 0600 env, jq, retries, unit)
+      ansible.builtin.assert:
+        that:
+          - "'jq' in (fip_script.content | b64decode)"
+          - "'--retry' in (fip_script.content | b64decode)"
+          - "'source \"$ENV_FILE\"' in (fip_script.content | b64decode)"
+          - "'test-token' not in (fip_script.content | b64decode)"
+          - fip_env.stat.exists
+          - fip_env.stat.mode == '0600'
+          - fip_unit.stat.exists
+        fail_msg: "Cloud FIP convergence (env file / jq / retries / unit) failed"
+        success_msg: "Cloud FIP converged on RKE2 env-file model"
+
+    - name: Stat cloud FIP log file
+      ansible.builtin.stat:
+        path: /var/log/cloud-floating-ip.log
+      register: fip_log
+
+    - name: Assert log file is 0600
+      ansible.builtin.assert:
+        that:
+          - fip_log.stat.mode == '0600'
+        fail_msg: "Cloud FIP log must be 0600"
+        success_msg: "Cloud FIP log is 0600"

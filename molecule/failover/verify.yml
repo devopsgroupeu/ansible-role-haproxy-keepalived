@@ -1,0 +1,122 @@
+---
+- name: Baseline - VIP on master, absent on backup
+  hosts: proxy_hosts
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Wait for VRRP election to settle
+      ansible.builtin.wait_for:
+        timeout: 10
+      delegate_to: localhost
+      become: false
+      run_once: true
+
+    - name: Read addresses
+      ansible.builtin.command: ip -o addr show
+      register: addr0
+      changed_when: false
+
+    - name: VIP present on master at baseline
+      ansible.builtin.assert:
+        that:
+          - "'172.18.0.200' in addr0.stdout"
+        fail_msg: "VIP not on master at baseline - VRRP election may not have completed"
+        success_msg: "VIP on master at baseline"
+      when: inventory_hostname == 'fo-master'
+
+    - name: VIP absent on backup at baseline
+      ansible.builtin.assert:
+        that:
+          - "'172.18.0.200' not in addr0.stdout"
+        fail_msg: "VIP unexpectedly on backup at baseline"
+        success_msg: "VIP absent on backup at baseline"
+      when: inventory_hostname == 'fo-backup'
+
+- name: Trigger failover by stopping HAProxy on master
+  hosts: fo-master
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Stop HAProxy on master to trigger VRRP FAULT
+      ansible.builtin.systemd_service:
+        name: haproxy
+        state: stopped
+
+- name: Assert VIP migrated to backup
+  hosts: fo-backup
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Poll until VIP appears on backup (retries 20 x 3s = 60s max)
+      ansible.builtin.command: ip -o addr show
+      register: addr_bk
+      changed_when: false
+      until: "'172.18.0.200' in addr_bk.stdout"
+      retries: 20
+      delay: 3
+
+    - name: VIP now on backup
+      ansible.builtin.assert:
+        that:
+          - "'172.18.0.200' in addr_bk.stdout"
+        fail_msg: "VIP did not migrate to backup after master HAProxy stop"
+        success_msg: "VIP migrated to backup - failover works"
+
+- name: Assert VIP departed the master
+  hosts: fo-master
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Poll until VIP leaves master (retries 15 x 2s = 30s max)
+      ansible.builtin.command: ip -o addr show
+      register: addr_mst
+      changed_when: false
+      until: "'172.18.0.200' not in addr_mst.stdout"
+      retries: 15
+      delay: 2
+
+    - name: VIP absent on master
+      ansible.builtin.assert:
+        that:
+          - "'172.18.0.200' not in addr_mst.stdout"
+        fail_msg: "VIP still on master after FAULT"
+        success_msg: "VIP left the master node (FAULT honored)"
+
+- name: Assert nopreempt - master recovery does NOT reclaim VIP
+  hosts: proxy_hosts
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Restart HAProxy on master
+      ansible.builtin.systemd_service:
+        name: haproxy
+        state: started
+      when: inventory_hostname == 'fo-master'
+
+    - name: Settle window after master recovery (nopreempt hold)
+      ansible.builtin.wait_for:
+        timeout: 10
+      delegate_to: localhost
+      become: false
+      run_once: true
+
+    - name: Re-read addresses
+      ansible.builtin.command: ip -o addr show
+      register: addr2
+      changed_when: false
+
+    - name: VIP stays on backup under nopreempt
+      ansible.builtin.assert:
+        that:
+          - "'172.18.0.200' in addr2.stdout"
+        fail_msg: "nopreempt violated: VIP should remain on backup"
+        success_msg: "nopreempt honored: VIP stayed on backup"
+      when: inventory_hostname == 'fo-backup'
+
+    - name: Recovered master did NOT reclaim VIP
+      ansible.builtin.assert:
+        that:
+          - "'172.18.0.200' not in addr2.stdout"
+        fail_msg: "nopreempt violated: recovered master reclaimed VIP"
+        success_msg: "nopreempt honored: recovered master stayed BACKUP"
+      when: inventory_hostname == 'fo-master'

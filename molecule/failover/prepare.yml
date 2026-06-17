@@ -1,0 +1,56 @@
+---
+- name: Prepare failover environment
+  hosts: all
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Fix PAM authentication for Rocky Linux
+      ansible.builtin.lineinfile:
+        path: /etc/pam.d/su
+        regexp: '^account\s+required\s+pam_access.so'
+        state: absent
+      when: ansible_os_family == 'RedHat'
+      failed_when: false
+
+    - name: Install iproute2 (Debian/Ubuntu)
+      ansible.builtin.package:
+        name: iproute2
+        state: present
+      when: ansible_os_family == 'Debian'
+
+    - name: Install iproute (Rocky/RHEL)
+      ansible.builtin.package:
+        name: iproute
+        state: present
+      when: ansible_os_family == 'RedHat'
+
+    - name: Ensure systemd-journald is running
+      ansible.builtin.service:
+        name: systemd-journald
+        state: started
+
+- name: Override keepalived service type for Docker
+  hosts: proxy_hosts
+  become: true
+  gather_facts: false
+  tasks:
+    # The packaged keepalived uses Type=notify which fails in Docker containers
+    # because child processes cannot send sd_notify. Override to Type=forking
+    # so the service starts cleanly in the molecule container environment.
+    - name: Create keepalived systemd drop-in directory
+      ansible.builtin.file:
+        path: /etc/systemd/system/keepalived.service.d
+        state: directory
+        mode: "0755"
+
+    - name: Override keepalived service type to forking for Docker
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/keepalived.service.d/docker-compat.conf
+        content: |
+          [Service]
+          Type=forking
+        mode: "0644"
+
+    - name: Reload systemd daemon
+      ansible.builtin.systemd_service:
+        daemon_reload: true
