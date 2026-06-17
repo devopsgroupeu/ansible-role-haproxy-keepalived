@@ -30,7 +30,6 @@ galaxy_info:
   platforms:
     - name: Ubuntu
       versions:
-        - jammy
         - noble
     - name: Debian
       versions:
@@ -38,7 +37,6 @@ galaxy_info:
         - trixie
     - name: EL
       versions:
-        - "8"
         - "9"
 
 dependencies: []
