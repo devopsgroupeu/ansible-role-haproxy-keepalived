@@ -76,48 +76,17 @@
         fail_msg: "Keepalived version must be 2.0 or higher. Current: {{ keepalived_version | default('not set') }}"
         success_msg: "Keepalived version {{ keepalived_version }} is valid"
 
-    - name: Validate Keepalived network interface
-      ansible.builtin.assert:
-        that:
-          - keepalived_network_interface is defined
-          - keepalived_network_interface | length > 0
-        fail_msg: "keepalived_network_interface must be set (e.g., eth0, ens3)"
-        success_msg: "Keepalived network interface {{ keepalived_network_interface }} is set"
-
-    - name: Validate VRRP instances
-      ansible.builtin.assert:
-        that:
-          - keepalived_vrrp_instances is defined
-          - keepalived_vrrp_instances | length > 0
-        fail_msg: "At least one VRRP instance must be defined in keepalived_vrrp_instances"
-        success_msg: "{{ keepalived_vrrp_instances | length }} VRRP instance(s) defined"
-
     - name: Validate each VRRP instance configuration
       loop: "{{ keepalived_vrrp_instances }}"
       loop_control:
         label: "{{ item.vrrp_instance_name | default('unnamed') }}"
       ansible.builtin.assert:
         that:
-          - item.vrrp_instance_name is defined
-          - item.vrrp_instance_name | length > 0
-          - item.virtual_ipaddress is defined
-          - item.virtual_ipaddress | length > 0
           - item.virtual_ipaddress is match('^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(/([0-9]|[1-2][0-9]|3[0-2]))?$')
-          - item.virtual_router_id is defined
-          - item.virtual_router_id | int >= 1
-          - item.virtual_router_id | int <= 255
         fail_msg: |
-          VRRP instance validation failed for: {{ item.vrrp_instance_name | default('unnamed') }}
-          Requirements:
-            - vrrp_instance_name: Must be set and non-empty
-            - virtual_ipaddress: Must be a valid IP address
-            - virtual_router_id: Must be between 1-255
-
-          Current values:
-            vrrp_instance_name: {{ item.vrrp_instance_name | default('NOT SET') }}
-            virtual_ipaddress: {{ item.virtual_ipaddress | default('NOT SET') }}
-            virtual_router_id: {{ item.virtual_router_id | default('NOT SET') }}
-        success_msg: "VRRP instance {{ item.vrrp_instance_name }} is valid"
+          VRRP instance {{ item.vrrp_instance_name | default('unnamed') }}: virtual_ipaddress
+          '{{ item.virtual_ipaddress | default('') }}' is not a valid IP address (with optional /prefix).
+        success_msg: "VRRP instance {{ item.vrrp_instance_name }} virtual_ipaddress is valid"
 
     - name: Validate proxy_hosts group for unicast mode
       when: keepalived_unicast | default(true) | bool

@@ -1,0 +1,274 @@
+---
+argument_specs:
+  main:
+    short_description: Install and configure HAProxy + Keepalived for HA load balancing
+    description: >
+      Installs HAProxy (package by default, source opt-in) and Keepalived
+      VRRP, renders validated configs, wires a floating VIP with
+      FAULT-on-failure failover, and optionally drives a Hetzner Cloud
+      floating IP.
+    author:
+      - DevOpsGroup
+    options:
+      loadbalancer_master:
+        type: str
+        required: true
+        description: inventory_hostname of the master proxy node.
+      loadbalancer_backup:
+        type: str
+        required: true
+        description: inventory_hostname of the backup proxy node.
+      haproxy_enabled:
+        type: bool
+        required: false
+        default: true
+        description: Install and configure HAProxy.
+      haproxy_version:
+        type: str
+        required: false
+        default: "3.4.0"
+        description: HAProxy source version (used only when haproxy_install_method=source).
+      haproxy_config:
+        type: str
+        required: false
+        default: ""
+        description: >
+          Complete HAProxy configuration as a literal string. When set, overrides
+          all dynamically generated configuration. Use for advanced custom configs
+          or migration from an existing setup.
+      haproxy_user:
+        type: str
+        required: false
+        default: haproxy
+        description: System user running HAProxy.
+      haproxy_group:
+        type: str
+        required: false
+        default: haproxy
+        description: System group for HAProxy.
+      haproxy_log_facility:
+        type: str
+        required: false
+        default: local2
+        choices: [local0, local1, local2, local3, local4, local5, local6, local7]
+        description: Syslog facility for HAProxy logs.
+      haproxy_mode:
+        type: str
+        required: false
+        default: http
+        choices: [http, tcp]
+        description: Default proxy mode.
+      haproxy_options:
+        type: list
+        elements: str
+        required: false
+        default:
+          - httplog
+          - dontlognull
+          - http-server-close
+          - forwardfor except 127.0.0.0/8
+          - redispatch
+        description: HAProxy defaults-section option lines.
+      haproxy_retries:
+        type: int
+        required: false
+        default: 3
+        description: Connection retry attempts.
+      haproxy_maxconn:
+        type: int
+        required: false
+        default: 3000
+        description: Maximum concurrent connections.
+      haproxy_timeout_http_request:
+        type: str
+        required: false
+        default: 10s
+        description: Maximum time to receive a complete HTTP request.
+      haproxy_timeout_connect:
+        type: str
+        required: false
+        default: 10s
+        description: Maximum time to establish a connection to a backend server.
+      haproxy_timeout_client:
+        type: str
+        required: false
+        default: 1m
+        description: Maximum inactivity time on the client side.
+      haproxy_timeout_server:
+        type: str
+        required: false
+        default: 1m
+        description: Maximum inactivity time on the server side.
+      haproxy_timeout_http_keep_alive:
+        type: str
+        required: false
+        default: 10s
+        description: Maximum time to wait for a new HTTP request after a keep-alive.
+      haproxy_timeout_check:
+        type: str
+        required: false
+        default: 10s
+        description: Maximum time for a health check to complete.
+      haproxy_stats:
+        type: bool
+        required: false
+        default: true
+        description: Enable the HAProxy stats page.
+      haproxy_stats_port:
+        type: int
+        required: false
+        default: 1936
+        description: Stats page port.
+      haproxy_stats_bind_addr:
+        type: str
+        required: false
+        default: "0.0.0.0"
+        description: Stats page bind address.
+      haproxy_stats_page_user:
+        type: str
+        required: false
+        default: admin
+        description: Stats page username.
+      haproxy_stats_page_pass:
+        type: str
+        required: false
+        default: admin
+        no_log: true
+        description: Stats page password (store in Vault; must not be 'admin').
+      haproxy_stats_page_uri:
+        type: str
+        required: false
+        default: /haproxy/stats
+        description: Stats page URI.
+      haproxy_frontends:
+        type: list
+        elements: dict
+        required: false
+        default: []
+        description: HAProxy frontend definitions.
+      haproxy_backend_default_balance:
+        type: str
+        required: false
+        default: roundrobin
+        description: Default load-balancing algorithm for backends.
+      haproxy_backends:
+        type: list
+        elements: dict
+        required: false
+        default: []
+        description: HAProxy backend definitions.
+      haproxy_listen_default_balance:
+        type: str
+        required: false
+        default: roundrobin
+        description: Default load-balancing algorithm for listen sections.
+      haproxy_listens:
+        type: list
+        elements: dict
+        required: false
+        default: []
+        description: HAProxy listen-section definitions.
+      haproxy_config_dir:
+        type: str
+        required: false
+        default: /etc/haproxy
+        description: HAProxy config directory.
+      haproxy_socket_dir:
+        type: str
+        required: false
+        default: /var/lib/haproxy
+        description: HAProxy runtime/chroot directory.
+      install_dir:
+        type: str
+        required: false
+        default: /usr/local/src
+        description: Directory where HAProxy and Keepalived source tarballs are built (source mode).
+      keepalived_enabled:
+        type: bool
+        required: false
+        default: true
+        description: Install and configure Keepalived.
+      keepalived_version:
+        type: str
+        required: false
+        default: "2.3.4"
+        description: Keepalived source version (used only when keepalived_install_method=source).
+      keepalived_log_facility:
+        type: str
+        required: false
+        default: local1
+        choices: [local0, local1, local2, local3, local4, local5, local6, local7]
+        description: Syslog facility for Keepalived logs.
+      keepalived_network_interface:
+        type: str
+        required: false
+        default: eth0
+        description: Interface for VRRP advertisements and the VIP.
+      keepalived_unicast:
+        type: bool
+        required: false
+        default: true
+        description: Use unicast VRRP (cloud-friendly); requires the proxy_hosts group.
+      keepalived_config_dir:
+        type: str
+        required: false
+        default: /etc/keepalived
+        description: Keepalived config directory.
+      keepalived_vrrp_instances:
+        type: list
+        elements: dict
+        required: true
+        description: VRRP instances (one floating VIP each).
+        options:
+          vrrp_instance_name:
+            type: str
+            required: true
+            description: Unique VRRP instance name.
+          virtual_ipaddress:
+            type: str
+            required: true
+            description: The floating VIP (plain or CIDR).
+          virtual_router_id:
+            type: int
+            required: true
+            description: VRRP router id, 1-255, unique per cluster.
+          priority:
+            type: int
+            required: false
+            description: VRRP priority override (default auto 100/90).
+          state:
+            type: str
+            required: false
+            choices: [MASTER, BACKUP]
+            description: Initial VRRP state override (default auto).
+      cloud_floating_ip_enabled:
+        type: bool
+        required: false
+        default: false
+        description: Enable Hetzner Cloud floating IP failover.
+      cloud_api_endpoint:
+        type: str
+        required: false
+        default: "https://api.hetzner.cloud/v1"
+        description: Hetzner Cloud API endpoint.
+      cloud_api_token:
+        type: str
+        required: false
+        default: ""
+        no_log: true
+        description: Hetzner Cloud API token (store in Vault).
+      cloud_floating_ip_address:
+        type: str
+        required: false
+        default: ""
+        description: The floating IP to manage (Hetzner only).
+      cloud_server_name:
+        type: str
+        required: false
+        default: "{{ inventory_hostname }}"
+        description: Server name used in API lookups.
+      cloud_floating_ip_interface:
+        type: str
+        required: false
+        default: eth0
+        description: Public interface the floating IP is added to.
