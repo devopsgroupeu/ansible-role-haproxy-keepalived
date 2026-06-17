@@ -301,8 +301,9 @@ keepalived_unicast: true
 #
 # VRRP Instance Configuration:
 #   - Uses unicast communication (cloud-friendly, no multicast)
-#   - Tracks HAProxy service health automatically
-#   - Automatic failover when HAProxy stops or fails health checks
+#   - Tracks HAProxy via vrrp_script haproxy_check (no weight = FAULT on death)
+#   - On HAProxy failure the node enters FAULT, drops priority, releases the
+#     VIP; the backup (base priority 90) promotes to MASTER and claims the VIP
 #   - Peers discovered automatically from proxy_hosts inventory group
 #
 # Example:

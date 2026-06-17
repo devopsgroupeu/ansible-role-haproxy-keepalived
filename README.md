@@ -148,6 +148,25 @@ graph TD
 
 > Full diagrams — failover sequence, cloud floating IP flow, request path, task execution order: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
+### How failover works
+
+Keepalived runs a `vrrp_script` (`haproxy_check`) that calls
+`service haproxy status` every 2s (`interval 2`, `fall 2`, `rise 2`).
+
+- **Healthy:** master holds base priority **100**, backup **90**; the VIP
+  sits on the master.
+- **HAProxy dies on the master:** after `fall 2` consecutive failures the
+  track script fails, the master's `vrrp_instance` enters **FAULT** and
+  releases the VIP. The backup, seeing no higher-priority advertisement,
+  transitions to **MASTER** and brings up the VIP — typically within
+  `interval × fall` (≈4s) plus one VRRP advert interval.
+- **HAProxy recovers:** after `rise 2` successes the node leaves FAULT. With
+  default preempt, the original master (priority 100) reclaims the VIP.
+
+The script uses **no `weight`**: a positive weight would *add* to the
+master's priority and prevent the VIP from ever moving. FAULT-on-failure is
+the correct, deterministic behavior.
+
 ---
 
 ## Inventory Structure
