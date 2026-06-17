@@ -262,6 +262,11 @@ keepalived_enabled: true
 # Check available versions: https://www.keepalived.org/download.html
 keepalived_version: 2.3.2
 
+# Syslog facility for Keepalived logging (local0-local7).
+# Set via a systemd drop-in (-S flag); the source-built unit does not read
+# /etc/default/keepalived, so the drop-in is the portable mechanism.
+keepalived_log_facility: local1
+
 # Network interface for VRRP advertisements
 # IMPORTANT: Must match the interface name on your system
 # Common values: eth0, ens3, ens160, ens192

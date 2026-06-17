@@ -1,0 +1,4 @@
+{{ ansible_managed | comment }}
+[Service]
+ExecStart=
+ExecStart={{ keepalived_binary | default('/usr/sbin/keepalived') }} -S {{ keepalived_log_facility }} -f {{ keepalived_config_dir }}/keepalived.conf -D
