@@ -368,13 +368,13 @@ keepalived_unicast_peers: []
 # the VIP; both nodes are then rendered with state BACKUP (required: nopreempt is
 # ignored on a MASTER-state node).
 keepalived_nopreempt: false
-# keepalived_preempt_delay: 60   # seconds to wait before preempting (preempt mode)
+keepalived_preempt_delay: 0   # seconds to wait before preempting (0 = instant; ignored when nopreempt is true)
 
 # VRRP timing / protocol tunables (per-instance overridable).
 keepalived_advert_int: 1
 keepalived_vrrp_version: 2
-# keepalived_garp_master_delay: 5     # seconds before gratuitous ARP after master
-# keepalived_garp_master_refresh: 0   # periodic gratuitous ARP refresh interval
+keepalived_garp_master_delay: 0     # seconds before gratuitous ARP after becoming master (0 = default)
+keepalived_garp_master_refresh: 0   # periodic gratuitous ARP refresh interval in seconds (0 = disabled)
 
 # HAProxy health-check command for the VRRP track_script. Absolute path is
 # required under enable_script_security with a minimal PATH.

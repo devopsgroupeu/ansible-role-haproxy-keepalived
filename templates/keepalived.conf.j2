@@ -27,7 +27,7 @@ vrrp_instance {{ vrrp_instance.vrrp_instance_name }} {
   version {{ vrrp_instance.vrrp_version | default(keepalived_vrrp_version) }}
 {% if keepalived_nopreempt | bool %}
   nopreempt
-{% elif vrrp_instance.preempt_delay is defined or keepalived_preempt_delay is defined %}
+{% elif (vrrp_instance.preempt_delay | default(keepalived_preempt_delay)) | int > 0 %}
   preempt_delay {{ vrrp_instance.preempt_delay | default(keepalived_preempt_delay) }}
 {% endif %}
 {% if (vrrp_instance.garp_master_delay | default(keepalived_garp_master_delay | default(false))) %}
