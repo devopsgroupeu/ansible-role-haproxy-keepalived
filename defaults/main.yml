@@ -312,6 +312,22 @@ haproxy_backends: []
 haproxy_listen_default_balance: roundrobin
 haproxy_listens: []
 
+# ----------------------------------------------------------------------------
+# Raw-append escape hatches (verbatim, no validation beyond haproxy -c)
+# ----------------------------------------------------------------------------
+haproxy_global_extra: ""       # appended to the global section
+haproxy_defaults_extra: ""     # appended to the defaults section
+haproxy_custom_sections: ""    # appended verbatim at end of file (peers, etc.)
+
+# Named DNS resolvers (list of {name, nameservers: ["id ip:port", ...]})
+haproxy_resolvers: []
+
+# Custom error pages (list of {code, path})
+haproxy_errorfiles: []
+
+# Send HAProxy logs to journald instead of rsyslog UDP (uses /dev/log).
+haproxy_journald: false
+
 # ============================================================================
 # Keepalived Configuration
 # ============================================================================
@@ -379,6 +395,13 @@ keepalived_garp_master_refresh: 0   # periodic gratuitous ARP refresh interval i
 # HAProxy health-check command for the VRRP track_script. Absolute path is
 # required under enable_script_security with a minimal PATH.
 keepalived_haproxy_check_script: "/usr/bin/systemctl is-active --quiet haproxy"
+
+# VRRP authentication (VRRPv2 only). Store the password in Ansible Vault.
+# Empty string = authentication disabled (rendered only when keepalived_auth_type is non-empty).
+# keepalived_auth_pass must come from Vault (e.g. vault_keepalived_auth_pass).
+# Max 8 chars, cleartext in the VRRP header (VRRPv2 only).
+keepalived_auth_type: ""   # PASS or AH; empty = no authentication block rendered
+keepalived_auth_pass: ""   # Store in Vault; no_log enforced in argument_specs
 
 # Sync groups: fail instances over together to avoid split VIPs.
 # - name: SG_MAIN

@@ -266,6 +266,22 @@
         fail_msg: "Health check must use absolute systemctl path, not 'service haproxy status'"
         success_msg: "Health check uses absolute systemctl"
 
+    # ========================================================================
+    # HAP-33: Raw hooks, errorfiles, resolvers, VRRP auth render
+    # ========================================================================
+
+    - name: Verify raw hooks, errorfiles, resolvers, VRRP auth render
+      ansible.builtin.assert:
+        that:
+          - "'tune.ssl.default-dh-param 2048' in (hap_cfg_stats.content | b64decode)"
+          - "'peers mypeers' in (hap_cfg_stats.content | b64decode)"
+          - "'errorfile 503 /etc/haproxy/errors/503.http' in (hap_cfg_stats.content | b64decode)"
+          - "'resolvers dns' in (hap_cfg_stats.content | b64decode)"
+          - "'authentication' in (ka_cfg.content | b64decode)"
+          - "'auth_type PASS' in (ka_cfg.content | b64decode)"
+        fail_msg: "LOW-item features did not render"
+        success_msg: "Raw hooks / errorfiles / resolvers / VRRP auth rendered"
+
     - name: Count running keepalived processes
       ansible.builtin.command: pgrep -x keepalived
       register: keepalived_pids

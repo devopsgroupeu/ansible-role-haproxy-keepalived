@@ -47,10 +47,18 @@
     - Cleanup haproxy config backups
 
 - name: Configure the rsyslog configuration file to accept UDP syslog reception
+  when: not haproxy_journald | bool
   ansible.builtin.template:
     src: haproxy-rsyslog.conf.j2
     dest: "/etc/rsyslog.d/haproxy.conf"
     mode: "0644"
+  notify: Restart rsyslog
+
+- name: Remove rsyslog HAProxy config when logging via journald
+  when: haproxy_journald | bool
+  ansible.builtin.file:
+    path: /etc/rsyslog.d/haproxy.conf
+    state: absent
   notify: Restart rsyslog
 
 - name: Ensure HAProxy service is running

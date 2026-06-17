@@ -107,6 +107,20 @@ provisioner:
             port: 80
             options:
               - check
+        haproxy_global_extra: |
+          tune.ssl.default-dh-param 2048
+        haproxy_custom_sections: |
+          peers mypeers
+            peer proxy-master 172.18.0.2:1024
+        haproxy_errorfiles:
+          - code: 503
+            path: /etc/haproxy/errors/503.http
+        haproxy_resolvers:
+          - name: dns
+            nameservers:
+              - "ns1 127.0.0.1:53"
+        keepalived_auth_type: PASS
+        keepalived_auth_pass: "vrrpsec"
 
 verifier:
   name: ansible

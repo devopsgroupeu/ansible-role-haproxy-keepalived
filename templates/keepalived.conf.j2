@@ -60,6 +60,13 @@ vrrp_instance {{ vrrp_instance.vrrp_instance_name }} {
     {{ vrrp_instance.virtual_ipaddress }}
   }
 
+{% if keepalived_auth_type | length > 0 and (vrrp_instance.vrrp_version | default(keepalived_vrrp_version)) == 2 %}
+  authentication {
+    auth_type {{ keepalived_auth_type }}
+    auth_pass {{ vrrp_instance.auth_pass | default(keepalived_auth_pass) }}
+  }
+{% endif %}
+
   track_script {
       haproxy_check
   }

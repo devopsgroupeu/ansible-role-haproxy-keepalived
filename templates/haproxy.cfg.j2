@@ -17,6 +17,9 @@ global
     ssl-default-bind-ciphers {{ haproxy_ssl_default_bind_ciphers }}
     ssl-default-bind-ciphersuites {{ haproxy_ssl_default_bind_ciphersuites }}
     ssl-default-bind-options ssl-min-ver {{ haproxy_ssl_min_ver }} no-tls-tickets
+{% if haproxy_global_extra | length > 0 %}
+{{ haproxy_global_extra | indent(4, true) }}
+{% endif %}
 
 defaults
     mode {{ haproxy_mode }}
@@ -37,6 +40,12 @@ defaults
 {% endif %}
     timeout check {{ haproxy_timeout_check }}
     maxconn {{ haproxy_maxconn }}
+{% for ef in haproxy_errorfiles | default([]) %}
+    errorfile {{ ef.code }} {{ ef.path }}
+{% endfor %}
+{% if haproxy_defaults_extra | length > 0 %}
+{{ haproxy_defaults_extra | indent(4, true) }}
+{% endif %}
 
 {% if haproxy_stats == true %}
 listen stats
@@ -106,6 +115,12 @@ backend {{ backend.name }}
 {% endif %}
     balance {{ backend.balance | default(haproxy_backend_default_balance) }}
     mode {{ backend.mode | default('http') }}
+{% if backend.stick_table is defined %}
+    stick-table {{ backend.stick_table }}
+{% endif %}
+{% if backend.stick_on is defined %}
+    stick on {{ backend.stick_on }}
+{% endif %}
 {% for rule in backend.http_request_rules | default([]) %}
     http-request {{ rule }}
 {% endfor %}
@@ -158,4 +173,15 @@ listen {{ listen.name }}
 {% endif %}
 {% endfor %}
 {% endfor %}
+
+{% for resolver in haproxy_resolvers | default([]) %}
+resolvers {{ resolver.name }}
+{% for ns in resolver.nameservers %}
+    nameserver {{ ns }}
+{% endfor %}
+{% endfor %}
+
+{% if haproxy_custom_sections | length > 0 %}
+{{ haproxy_custom_sections }}
+{% endif %}
 {% endif %}
