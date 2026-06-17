@@ -4,7 +4,7 @@
 # ============================================================================
 # Optional tasks for cloud provider Floating IP automatic failover
 # Only runs when cloud_floating_ip_enabled: true
-# Supports: Hetzner Cloud, DigitalOcean, AWS, and custom APIs
+# Supports: Hetzner Cloud ONLY (see README — DO/AWS are not implemented)
 
 - name: Validate cloud Floating IP configuration
   ansible.builtin.assert:

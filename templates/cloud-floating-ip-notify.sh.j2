@@ -6,9 +6,9 @@
 # This script is called by Keepalived when VRRP state changes
 # Part of: ansible-role-haproxy-keepalived
 #
-# Supported providers:
-#   - Hetzner Cloud (default API implementation)
-#   - Custom provider (adapt API calls)
+# Supported provider:
+#   - Hetzner Cloud only (Hetzner Cloud v1 API). Other providers require a
+#     different request shape / auth and are not implemented here.
 #
 
 set -euo pipefail

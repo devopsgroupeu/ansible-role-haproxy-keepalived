@@ -274,7 +274,7 @@ keepalived_log_facility: local1
 keepalived_network_interface: eth0
 
 # Use unicast instead of multicast for VRRP communication.
-# Set to true for cloud environments (AWS, Hetzner, DigitalOcean) where multicast is blocked.
+# Set to true for cloud environments (e.g. Hetzner) where multicast is blocked.
 # Set to false for bare-metal / on-prem networks where multicast is available.
 # NOTE: When true, hosts must be in the 'proxy_hosts' inventory group for peer discovery.
 keepalived_unicast: true
@@ -359,14 +359,13 @@ keepalived_config_dir: /etc/keepalived
 #
 # ⚠️  SECURITY WARNING: Store cloud_api_token in Ansible Vault!
 #
-# Supported providers:
-#   - Hetzner Cloud
-#   - DigitalOcean
-#   - AWS Elastic IP
-#   - Or any provider with REST API for IP assignment
+# Supported provider: Hetzner Cloud ONLY.
+#   The shipped notify script speaks the Hetzner Cloud v1 API end-to-end.
+#   DigitalOcean (/v2/reserved_ips + droplet_id) and AWS (SigV4-signed, a
+#   Bearer-token curl cannot authenticate) are NOT supported by this script.
 #
 # Requirements:
-#   - Cloud account with Floating/Elastic IP
+#   - Hetzner Cloud account with a Floating IP
 #   - API token with appropriate permissions
 #   - curl installed on servers
 #
@@ -381,10 +380,8 @@ keepalived_config_dir: /etc/keepalived
 # Enable cloud Floating IP API integration
 cloud_floating_ip_enabled: false
 
-# Cloud provider API endpoint
+# Cloud provider API endpoint (Hetzner Cloud v1 only)
 # Hetzner: https://api.hetzner.cloud/v1
-# DigitalOcean: https://api.digitalocean.com/v2
-# Custom: your API endpoint
 cloud_api_endpoint: "https://api.hetzner.cloud/v1"
 
 # Cloud API Token (⚠️  Store in vault!)

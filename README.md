@@ -227,15 +227,19 @@ Multiple VIPs are supported — add more items to `keepalived_vrrp_instances`.
 
 ### Cloud Floating IP
 
-For cloud environments with a provider-managed floating IP:
+For **Hetzner Cloud** environments with a provider-managed floating IP. Only
+Hetzner is supported — the notify script speaks the Hetzner Cloud v1 API.
+DigitalOcean and AWS are not implemented (different API shape / SigV4 auth).
 
 ```yaml
 cloud_floating_ip_enabled: true
 cloud_api_token: "{{ vault_cloud_api_token }}"
-floating_ip_address: "1.2.3.4"
+cloud_floating_ip_address: "1.2.3.4"
 ```
 
-When enabled, a notify script is deployed to Keepalived that calls the cloud provider API on VIP transition, moving the floating IP to the new master.
+The API token is written to `/etc/keepalived/cloud-floating-ip.env` (`0600`),
+never into the script body. On VIP transition, Keepalived runs the notify
+script which reassigns the Hetzner floating IP to the new master.
 
 ---
 
