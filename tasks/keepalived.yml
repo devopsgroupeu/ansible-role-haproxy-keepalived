@@ -19,8 +19,8 @@
   ansible.builtin.command:
     cmd: "{{ keepalived_binary }} -t"
   changed_when: false
-  notify:
-    - Reload keepalived
+  register: keepalived_config_check
+  failed_when: keepalived_config_check.rc != 0
 
 - name: Create keepalived systemd drop-in directory
   when: keepalived_enabled | bool
