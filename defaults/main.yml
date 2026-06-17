@@ -31,11 +31,54 @@ loadbalancer_backup: ""
 # Enable/disable HAProxy installation and configuration
 haproxy_enabled: true
 
-# HAProxy version to compile when haproxy_install_method=source.
-# LTS policy: even-numbered branches only (3.0/3.2/3.4...). Default is the
-# newest LTS. Package mode is distro-driven and ignores this var.
+# HAProxy version to target. In source mode this is the exact tarball version
+# to compile. In package mode apt/dnf owns the version; this var is ignored
+# for package selection but used to label the downloaded tarball in source mode.
+# LTS policy: even-numbered branches only (3.0/3.2/3.4...).
 # Check available versions: https://www.haproxy.org/download/
 haproxy_version: "3.4.0"
+
+# SHA256 checksum for the HAProxy source tarball (REQUIRED in source mode).
+# Either a literal "sha256:<hex>" or a remote ".sha256" URL. haproxy.org
+# publishes a <tarball>.sha256 sidecar next to each release.
+haproxy_src_sha256: ""
+
+# Install method: 'package' (default, distro/repo-driven) or 'source' (compile).
+haproxy_install_method: package
+
+# Optional repo branch for package mode (e.g. "3.0" or "3.4"). Selects the
+# vbernat PPA (Ubuntu) / haproxy.debian.net backport (Debian) for that branch.
+# Empty = use the distribution's default HAProxy.
+haproxy_branch: ""
+
+# Absolute path to the haproxy binary (method-aware). Override if your distro
+# places it elsewhere.
+haproxy_binary: "{{ '/usr/local/sbin/haproxy' if haproxy_install_method == 'source' else '/usr/sbin/haproxy' }}"
+
+# make flags for source-mode HAProxy builds. QUIC compat needs HAProxy >=2.9
+# and OpenSSL >=3.0, so it is added only on capable versions. Override the
+# whole list to fully customize the build.
+haproxy_make_flags_default:
+  - "TARGET=linux-glibc"
+  - "USE_OPENSSL=1"
+  - "USE_PCRE2=1"
+  - "USE_LUA=1"
+  - "USE_SLZ=1"
+  - "USE_SYSTEMD=1"
+  - "USE_PROMEX=1"
+  - "USE_PCRE2_JIT=1"
+haproxy_make_flags: >-
+  {{ haproxy_make_flags_default + (['USE_QUIC=1', 'USE_QUIC_OPENSSL_COMPAT=1']
+     if haproxy_version is version('2.9', '>=') else []) }}
+
+# Purge the build toolchain after a source install (saves space, reduces LB
+# attack surface). Only effective in source mode.
+haproxy_remove_build_deps: false
+
+# Offline/air-gapped source install: copy a pre-staged tarball from the
+# controller instead of downloading from haproxy.org.
+haproxy_offline_install: false
+haproxy_src_local_path: ""
 
 # Complete HAProxy configuration as a string (alternative to individual parameters)
 # If set, this will be used instead of the dynamically generated configuration
@@ -259,9 +302,27 @@ haproxy_listens: []
 # Enable/disable Keepalived installation and configuration
 keepalived_enabled: true
 
-# Keepalived version to install (minimum supported: 2.0)
+# Keepalived version to target. In source mode this is the exact tarball version.
+# In package mode apt/dnf owns the version; this var is informational only.
 # Check available versions: https://www.keepalived.org/download.html
 keepalived_version: "2.3.4"
+
+# SHA256 checksum for the Keepalived source tarball (REQUIRED in source mode).
+keepalived_src_sha256: ""
+
+# Install method: 'package' (default) or 'source' (compile).
+keepalived_install_method: package
+
+# Absolute path to the keepalived binary (method-aware).
+keepalived_binary: "{{ '/usr/local/sbin/keepalived' if keepalived_install_method == 'source' else '/usr/sbin/keepalived' }}"
+
+# ./configure flags for source-mode Keepalived builds. Override the whole list
+# to change behavior (e.g. drop --enable-snmp if SNMP is unused).
+keepalived_configure_flags_default:
+  - "--with-init=systemd"
+  - "--enable-snmp"
+  - "--enable-bfd"
+keepalived_configure_flags: "{{ keepalived_configure_flags_default }}"
 
 # Syslog facility for Keepalived logging (local0-local7).
 # Set via a systemd drop-in (-S flag); the source-built unit does not read
@@ -337,8 +398,8 @@ keepalived_vrrp_instances:
 # Installation and configuration directories
 # Generally safe to use defaults unless you have specific filesystem requirements
 
-# Source code compilation directory
-install_dir: /usr/local/src
+# Source code compilation directory (used in source mode only)
+haproxy_install_dir: /usr/local/src
 
 # HAProxy runtime directory for Unix sockets and chroot
 haproxy_socket_dir: /var/lib/haproxy
@@ -347,6 +408,10 @@ haproxy_socket_dir: /var/lib/haproxy
 # Config file will be: {{ haproxy_config_dir }}/haproxy.cfg
 # SSL certificates directory: {{ haproxy_config_dir }}/certs/
 haproxy_config_dir: /etc/haproxy
+
+# Path (on the controller) to a directory of SSL certs to deploy into
+# {{ haproxy_config_dir }}/certs/. Empty = do not deploy any certs.
+haproxy_ssl_cert_src: ""
 
 # Keepalived configuration file directory
 # Config file will be: {{ keepalived_config_dir }}/keepalived.conf

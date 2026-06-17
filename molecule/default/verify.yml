@@ -21,12 +21,24 @@
       changed_when: false
       failed_when: haproxy_version_check.rc != 0
 
-    - name: Verify HAProxy version
+    - name: Verify HAProxy is installed (version check passes)
       ansible.builtin.assert:
         that:
-          - "'3.1.4' in haproxy_version_check.stdout"
-        fail_msg: "HAProxy version mismatch"
-        success_msg: "HAProxy version is correct"
+          - haproxy_version_check.rc == 0
+        fail_msg: "HAProxy is not installed or not executable"
+        success_msg: "HAProxy is installed"
+
+    - name: Locate the haproxy binary
+      ansible.builtin.command: which haproxy
+      register: haproxy_which
+      changed_when: false
+
+    - name: Assert HAProxy installed via package path (default install method)
+      ansible.builtin.assert:
+        that:
+          - "'/usr/local/sbin' not in haproxy_which.stdout"
+        fail_msg: "HAProxy is in /usr/local/sbin (source build); package mode expected by default"
+        success_msg: "HAProxy installed from distro package"
 
     - name: Check if HAProxy service is running
       ansible.builtin.service_facts:
@@ -76,6 +88,27 @@
       delay: 2
 
     # ========================================================================
+    # HAP-16: Source-specific build deps absent in package mode
+    # Note: the geerlingguy base image ships gcc/build-essential pre-installed.
+    # We assert the role-specific source deps (liblua5.4-dev, libpcre2-dev)
+    # were NOT installed — those are only added by haproxy_install_source.yml.
+    # ========================================================================
+
+    - name: Check for liblua5.4-dev (source-only HAProxy build dep)
+      ansible.builtin.command: dpkg -s liblua5.4-dev
+      register: lua_dev_pkg
+      changed_when: false
+      failed_when: false
+
+    - name: Assert source-specific build deps absent in package mode
+      ansible.builtin.assert:
+        that:
+          - lua_dev_pkg.rc != 0
+        fail_msg: "liblua5.4-dev is installed in package mode; source build deps should be source-only"
+        success_msg: "Source-specific build toolchain absent in package mode"
+      when: ansible_facts['os_family'] == 'Debian'
+
+    # ========================================================================
     # Keepalived Verification
     # ========================================================================
 
@@ -85,12 +118,12 @@
       changed_when: false
       failed_when: keepalived_version_check.rc != 0
 
-    - name: Verify Keepalived version
+    - name: Verify Keepalived is installed (version check passes)
       ansible.builtin.assert:
         that:
-          - "'2.3.2' in keepalived_version_check.stderr"
-        fail_msg: "Keepalived version mismatch"
-        success_msg: "Keepalived version is correct"
+          - keepalived_version_check.rc == 0
+        fail_msg: "Keepalived is not installed"
+        success_msg: "Keepalived is installed"
 
     - name: Check if Keepalived service is running
       ansible.builtin.assert:
@@ -154,6 +187,7 @@
       ansible.builtin.command: >-
         grep -q "Reload haproxy" {{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/handlers/main.yml
       delegate_to: localhost
+      become: false
       run_once: true
       changed_when: false
       register: reload_handler_grep
@@ -172,6 +206,28 @@
           rsyslog captures a facility that does not match haproxy_log_facility
           (local2); HAProxy logs are silently dropped.
         success_msg: "rsyslog captures the configured HAProxy facility"
+
+    # ========================================================================
+    # HAP-22: ip_nonlocal_bind set via sysctl drop-in
+    # ========================================================================
+
+    - name: Check ip_nonlocal_bind sysctl drop-in
+      ansible.builtin.stat:
+        path: /etc/sysctl.d/60-keepalived.conf
+      register: nonlocal_dropin
+
+    - name: Read live ip_nonlocal_bind value
+      ansible.builtin.command: sysctl -n net.ipv4.ip_nonlocal_bind
+      register: nonlocal_live
+      changed_when: false
+
+    - name: Assert ip_nonlocal_bind set via drop-in and active
+      ansible.builtin.assert:
+        that:
+          - nonlocal_dropin.stat.exists
+          - nonlocal_live.stdout | trim == '1'
+        fail_msg: "ip_nonlocal_bind not set via /etc/sysctl.d drop-in or not active"
+        success_msg: "ip_nonlocal_bind set declaratively and active"
 
     # ========================================================================
     # Directory and File Permissions
@@ -239,6 +295,7 @@
       ansible.builtin.wait_for:
         timeout: 10
       delegate_to: localhost
+      become: false
 
     - name: Check if VIP is assigned
       ansible.builtin.command: ip addr show
@@ -260,7 +317,7 @@
       ansible.builtin.debug:
         msg:
           - "=========================================="
-          - "✅ All verification tests passed!"
+          - "All verification tests passed!"
           - "=========================================="
           - "HAProxy: Installed and running"
           - "Keepalived: Installed and running"

@@ -1,0 +1,48 @@
+---
+- name: Add vbernat HAProxy PPA (Ubuntu, branch pinned)
+  ansible.builtin.deb822_repository:
+    name: "haproxy-{{ haproxy_branch }}"
+    types: [deb]
+    uris: "https://ppa.launchpadcontent.net/vbernat/haproxy-{{ haproxy_branch }}/ubuntu"
+    suites: "{{ ansible_facts['distribution_release'] }}"
+    components: [main]
+    signed_by: "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x6285FB2D3AB5FA8E"
+    state: present
+    enabled: true
+  when:
+    - ansible_facts['distribution'] == 'Ubuntu'
+    - haproxy_branch | length > 0
+
+- name: Add haproxy.debian.net repo (Debian, branch pinned)
+  ansible.builtin.deb822_repository:
+    name: "haproxy-{{ haproxy_branch }}"
+    types: [deb]
+    uris: "https://haproxy.debian.net"
+    suites: "{{ ansible_facts['distribution_release'] }}-backports-{{ haproxy_branch }}"
+    components: [main]
+    signed_by: "https://haproxy.debian.net/bernat.debian.org.gpg"
+    state: present
+    enabled: true
+  when:
+    - ansible_facts['distribution'] == 'Debian'
+    - haproxy_branch | length > 0
+
+- name: Install HAProxy (Debian/Ubuntu)
+  ansible.builtin.apt:
+    name: haproxy
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  when: ansible_facts['os_family'] == 'Debian'
+
+- name: Install HAProxy (RHEL family)
+  ansible.builtin.dnf:
+    name: haproxy
+    state: present
+  when: ansible_facts['os_family'] == 'RedHat'
+
+- name: Ensure HAProxy systemd unit is enabled
+  ansible.builtin.systemd_service:
+    name: haproxy
+    enabled: true
+    daemon_reload: true

@@ -1,0 +1,118 @@
+---
+- name: Install Keepalived build toolchain (RHEL family)
+  ansible.builtin.package:
+    name:
+      - make
+      - gcc
+      - openssl-devel
+      - libnl3-devel
+      - net-snmp-devel
+    state: present
+  when: ansible_facts['os_family'] == 'RedHat'
+
+- name: Install Keepalived build toolchain (Debian/Ubuntu)
+  ansible.builtin.package:
+    name:
+      - build-essential
+      - gcc
+      - libssl-dev
+      - libnl-3-dev
+      - libnl-genl-3-dev
+      - libsnmp-dev
+    state: present
+  when: ansible_facts['os_family'] == 'Debian'
+
+- name: Check Keepalived installation status (source)
+  block:
+    - name: Get installed Keepalived version
+      ansible.builtin.command: "{{ keepalived_binary }} --version"
+      register: keepalived_installed
+      changed_when: false
+      ignore_errors: true
+      check_mode: false
+
+    - name: Extract installed Keepalived version
+      ansible.builtin.set_fact:
+        installed_keepalived_version: "{{ (keepalived_installed.stderr | regex_search('Keepalived v(\\d+\\.\\d+\\.\\d+)', '\\1') | default([''], true)) | first }}"
+  rescue:
+    - name: Set empty version if not installed
+      ansible.builtin.set_fact:
+        installed_keepalived_version: ""
+
+- name: Determine if Keepalived installation is required
+  ansible.builtin.set_fact:
+    keepalived_installation_required: "{{ installed_keepalived_version | default('') is version(keepalived_version, '!=') }}"
+
+- name: Install Keepalived from source if required
+  when: keepalived_installation_required
+  block:
+    - name: Require a source checksum (Keepalived)
+      ansible.builtin.assert:
+        that:
+          - keepalived_src_sha256 | length > 0
+        fail_msg: >-
+          keepalived_install_method=source requires keepalived_src_sha256.
+        success_msg: "Keepalived source checksum provided"
+
+    - name: Download Keepalived source on the target
+      ansible.builtin.get_url:
+        url: "https://www.keepalived.org/software/keepalived-{{ keepalived_version }}.tar.gz"
+        dest: "{{ haproxy_install_dir }}/keepalived-{{ keepalived_version }}.tar.gz"
+        mode: "0644"
+        checksum: "{{ keepalived_src_sha256 }}"
+
+    - name: Extract Keepalived source
+      ansible.builtin.unarchive:
+        src: "{{ haproxy_install_dir }}/keepalived-{{ keepalived_version }}.tar.gz"
+        dest: "{{ haproxy_install_dir }}"
+        remote_src: true
+        creates: "{{ haproxy_install_dir }}/keepalived-{{ keepalived_version }}/configure"
+
+    - name: Configure Keepalived
+      ansible.builtin.command:
+        cmd: "./configure {{ keepalived_configure_flags | join(' ') }}"
+      args:
+        chdir: "{{ haproxy_install_dir }}/keepalived-{{ keepalived_version }}"
+        creates: "{{ haproxy_install_dir }}/keepalived-{{ keepalived_version }}/Makefile"
+      register: keepalived_configure
+      changed_when: keepalived_configure.rc == 0
+
+    - name: Compile Keepalived
+      ansible.builtin.command:
+        cmd: make
+      args:
+        chdir: "{{ haproxy_install_dir }}/keepalived-{{ keepalived_version }}"
+        creates: "{{ haproxy_install_dir }}/keepalived-{{ keepalived_version }}/keepalived/keepalived"
+      register: keepalived_compile
+      changed_when: keepalived_compile.rc == 0
+
+    - name: Install Keepalived
+      ansible.builtin.command:
+        cmd: make install
+      args:
+        chdir: "{{ haproxy_install_dir }}/keepalived-{{ keepalived_version }}"
+      register: keepalived_install
+      changed_when: keepalived_install.rc == 0
+
+    - name: Check generated keepalived.service exists
+      ansible.builtin.stat:
+        path: "{{ haproxy_install_dir }}/keepalived-{{ keepalived_version }}/keepalived/keepalived.service"
+      register: keepalived_unit_src
+
+    - name: Deploy Keepalived systemd service from source
+      ansible.builtin.copy:
+        src: "{{ haproxy_install_dir }}/keepalived-{{ keepalived_version }}/keepalived/keepalived.service"
+        dest: /etc/systemd/system/keepalived.service
+        mode: "0644"
+        remote_src: true
+      notify: Reload systemd
+      when: keepalived_unit_src.stat.exists
+
+- name: Remove Keepalived build toolchain after source install
+  ansible.builtin.package:
+    name:
+      - gcc
+      - make
+    state: absent
+  when:
+    - haproxy_remove_build_deps | bool
