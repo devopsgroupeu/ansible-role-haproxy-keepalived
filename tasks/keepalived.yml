@@ -106,6 +106,7 @@
     backup: true
   notify:
     - Cleanup keepalived config backups
+    - Reload keepalived
 
 - name: Validate Keepalived configuration
   when: keepalived_enabled | bool
@@ -113,7 +114,7 @@
     cmd: keepalived -t
   changed_when: false
   notify:
-    - Restart keepalived
+    - Reload keepalived
 
 - name: Create keepalived systemd drop-in directory
   when: keepalived_enabled | bool

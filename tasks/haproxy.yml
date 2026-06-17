@@ -135,7 +135,7 @@
     validate: haproxy -f %s -c
     backup: true
   notify:
-    - Restart haproxy
+    - Reload haproxy
     - Cleanup haproxy config backups
 
 - name: Configure the rsyslog configuration file to accept UDP syslog reception
