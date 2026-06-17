@@ -67,10 +67,22 @@ provisioner:
         keepalived_enabled: true
         keepalived_version: "2.3.4"
         keepalived_network_interface: eth0
+        keepalived_peer_group: proxy_hosts
+        keepalived_nopreempt: true
+        keepalived_advert_int: 2
+        keepalived_garp_master_delay: 5
         keepalived_vrrp_instances:
           - vrrp_instance_name: VI_TEST
             virtual_ipaddress: "172.18.0.100"
             virtual_router_id: 51
+          - vrrp_instance_name: VI_TEST2
+            virtual_ipaddress: "172.18.0.101"
+            virtual_router_id: 52
+        keepalived_sync_groups:
+          - name: SG_TEST
+            instances:
+              - VI_TEST
+              - VI_TEST2
         haproxy_frontends:
           - name: test_http_frontend
             address: "*"

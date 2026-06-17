@@ -221,6 +221,51 @@
           a positive weight defeats failover (master keeps VIP when HAProxy dies).
         success_msg: "vrrp_script uses clean FAULT-on-failure (no weight)"
 
+    # Alias for HAP-26/28 tasks that reference ka_cfg register name
+    - name: Read rendered keepalived config (ka_cfg alias)
+      ansible.builtin.slurp:
+        src: /etc/keepalived/keepalived.conf
+      register: ka_cfg
+
+    # ========================================================================
+    # HAP-26: vrrp_sync_group, nopreempt, advert_int, garp tunables
+    # ========================================================================
+
+    - name: Verify sync group, nopreempt and VRRP tunables render
+      ansible.builtin.assert:
+        that:
+          - "'vrrp_sync_group SG_TEST' in (ka_cfg.content | b64decode)"
+          - "'nopreempt' in (ka_cfg.content | b64decode)"
+          - "'advert_int 2' in (ka_cfg.content | b64decode)"
+          - "'garp_master_delay 5' in (ka_cfg.content | b64decode)"
+          - "'state MASTER' not in (ka_cfg.content | b64decode)"
+        fail_msg: "Sync group / nopreempt / tunables not rendered, or MASTER state forced under nopreempt"
+        success_msg: "VRRP sync group + flap-control tunables rendered"
+
+    # ========================================================================
+    # HAP-27: Configurable peer group rendered
+    # ========================================================================
+
+    - name: Verify unicast peer block is rendered
+      ansible.builtin.assert:
+        that:
+          - "'unicast_peer' in (ka_cfg.content | b64decode)"
+          - "(ka_cfg.content | b64decode).count('unicast_peer') >= 1"
+        fail_msg: "Unicast peer block missing"
+        success_msg: "Unicast peer block rendered"
+
+    # ========================================================================
+    # HAP-28: Health check uses absolute systemctl path
+    # ========================================================================
+
+    - name: Verify health check uses absolute systemctl
+      ansible.builtin.assert:
+        that:
+          - "'/usr/bin/systemctl is-active --quiet haproxy' in (ka_cfg.content | b64decode)"
+          - "'service haproxy status' not in (ka_cfg.content | b64decode)"
+        fail_msg: "Health check must use absolute systemctl path, not 'service haproxy status'"
+        success_msg: "Health check uses absolute systemctl"
+
     - name: Count running keepalived processes
       ansible.builtin.command: pgrep -x keepalived
       register: keepalived_pids
@@ -351,11 +396,14 @@
         timeout: 10
       delegate_to: localhost
       become: false
+      # nopreempt: VIP will be claimed by whichever node wins election; skip assertion
+      when: not (keepalived_nopreempt | default(false) | bool)
 
     - name: Check if VIP is assigned
       ansible.builtin.command: ip addr show
       register: ip_check
       changed_when: false
+      when: not (keepalived_nopreempt | default(false) | bool)
 
     - name: Verify VIP is present on master
       ansible.builtin.assert:
@@ -363,6 +411,7 @@
           - "'172.18.0.100' in ip_check.stdout"
         fail_msg: "Virtual IP not found on master node"
         success_msg: "Virtual IP is assigned to master node"
+      when: not (keepalived_nopreempt | default(false) | bool)
 
 - name: Display test summary
   hosts: proxy_hosts

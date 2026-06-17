@@ -80,6 +80,7 @@
   when:
     - keepalived_enabled | bool
     - inventory_hostname == loadbalancer_master
+    - not (keepalived_nopreempt | bool)
   ansible.builtin.command: ip addr show
   register: vip_check
   changed_when: false

@@ -5,7 +5,7 @@ global_defs {
 }
 
 vrrp_script haproxy_check {
-  script "service haproxy status"
+  script "{{ keepalived_haproxy_check_script }}"
   timeout 2
   interval 2
   fall 2
@@ -17,18 +17,42 @@ vrrp_script haproxy_check {
 vrrp_instance {{ vrrp_instance.vrrp_instance_name }} {
   interface {{ keepalived_network_interface }}
   priority {{ vrrp_instance.priority | default((inventory_hostname == loadbalancer_master) | ternary(100, 90)) }}
+{% if keepalived_nopreempt | bool %}
+  state BACKUP
+{% else %}
   state {{ vrrp_instance.state | default((inventory_hostname == loadbalancer_master) | ternary('MASTER', 'BACKUP')) }}
+{% endif %}
   virtual_router_id {{ vrrp_instance.virtual_router_id }}
+  advert_int {{ vrrp_instance.advert_int | default(keepalived_advert_int) }}
+  version {{ vrrp_instance.vrrp_version | default(keepalived_vrrp_version) }}
+{% if keepalived_nopreempt | bool %}
+  nopreempt
+{% elif vrrp_instance.preempt_delay is defined or keepalived_preempt_delay is defined %}
+  preempt_delay {{ vrrp_instance.preempt_delay | default(keepalived_preempt_delay) }}
+{% endif %}
+{% if (vrrp_instance.garp_master_delay | default(keepalived_garp_master_delay | default(false))) %}
+  garp_master_delay {{ vrrp_instance.garp_master_delay | default(keepalived_garp_master_delay) }}
+{% endif %}
+{% if (vrrp_instance.garp_master_refresh | default(keepalived_garp_master_refresh | default(false))) %}
+  garp_master_refresh {{ vrrp_instance.garp_master_refresh | default(keepalived_garp_master_refresh) }}
+{% endif %}
 
 {% if keepalived_unicast | default(true) %}
   # Use unicast mode for environments where multicast is not available (e.g. cloud)
-  unicast_src_ip {{ hostvars[inventory_hostname]['ansible_' + keepalived_network_interface]['ipv4']['address'] | default(ansible_default_ipv4.address) }}
+{% set iface_key = keepalived_network_interface | replace('-', '_') | replace('.', '_') %}
+  unicast_src_ip {{ ansible_facts[iface_key]['ipv4']['address'] }}
   unicast_peer {
-{% for host in groups['proxy_hosts'] %}
+{% if keepalived_unicast_peers | length > 0 %}
+{% for peer in keepalived_unicast_peers %}
+    {{ peer }}
+{% endfor %}
+{% else %}
+{% for host in groups[keepalived_peer_group] %}
 {% if host != inventory_hostname %}
-    {{ hostvars[host]['ansible_' + keepalived_network_interface]['ipv4']['address'] | default(hostvars[host]['ansible_default_ipv4']['address']) }}
+    {{ hostvars[host]['ansible_facts'][keepalived_network_interface | replace('-', '_') | replace('.', '_')]['ipv4']['address'] }}
 {% endif %}
 {% endfor %}
+{% endif %}
   }
 {% endif %}
 
@@ -40,7 +64,7 @@ vrrp_instance {{ vrrp_instance.vrrp_instance_name }} {
       haproxy_check
   }
 
-{% if cloud_floating_ip_enabled | default(false) %}
+{% if cloud_floating_ip_enabled | default(false) and keepalived_sync_groups | default([]) | length == 0 %}
   # Cloud Floating IP API integration
   notify_master "/usr/local/bin/cloud-floating-ip-notify.sh MASTER"
   notify_backup "/usr/local/bin/cloud-floating-ip-notify.sh BACKUP"
@@ -48,4 +72,19 @@ vrrp_instance {{ vrrp_instance.vrrp_instance_name }} {
 {% endif %}
 }
 
+{% endfor %}
+
+{% for sg in keepalived_sync_groups | default([]) %}
+vrrp_sync_group {{ sg.name }} {
+  group {
+{% for inst in sg.instances %}
+    {{ inst }}
+{% endfor %}
+  }
+{% if cloud_floating_ip_enabled | default(false) %}
+  notify_master "/usr/local/bin/cloud-floating-ip-notify.sh MASTER"
+  notify_backup "/usr/local/bin/cloud-floating-ip-notify.sh BACKUP"
+  notify_fault "/usr/local/bin/cloud-floating-ip-notify.sh FAULT"
+{% endif %}
+}
 {% endfor %}

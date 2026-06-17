@@ -358,6 +358,33 @@ keepalived_network_interface: eth0
 # NOTE: When true, hosts must be in the 'proxy_hosts' inventory group for peer discovery.
 keepalived_unicast: true
 
+# Inventory group used for automatic unicast peer discovery.
+keepalived_peer_group: proxy_hosts
+
+# Explicit unicast peer IPs (overrides auto-discovery from keepalived_peer_group).
+keepalived_unicast_peers: []
+
+# VRRP flap control. When nopreempt is true a recovered master will NOT reclaim
+# the VIP; both nodes are then rendered with state BACKUP (required: nopreempt is
+# ignored on a MASTER-state node).
+keepalived_nopreempt: false
+# keepalived_preempt_delay: 60   # seconds to wait before preempting (preempt mode)
+
+# VRRP timing / protocol tunables (per-instance overridable).
+keepalived_advert_int: 1
+keepalived_vrrp_version: 2
+# keepalived_garp_master_delay: 5     # seconds before gratuitous ARP after master
+# keepalived_garp_master_refresh: 0   # periodic gratuitous ARP refresh interval
+
+# HAProxy health-check command for the VRRP track_script. Absolute path is
+# required under enable_script_security with a minimal PATH.
+keepalived_haproxy_check_script: "/usr/bin/systemctl is-active --quiet haproxy"
+
+# Sync groups: fail instances over together to avoid split VIPs.
+# - name: SG_MAIN
+#   instances: [VI_1, VI_2]
+keepalived_sync_groups: []
+
 # ----------------------------------------------------------------------------
 # VRRP Instances
 # ----------------------------------------------------------------------------
@@ -493,3 +520,6 @@ cloud_server_name: "{{ inventory_hostname }}"
 # Common values: eth0, ens3, ens160
 # NOTE: This is different from keepalived_network_interface (which is the private network)
 cloud_floating_ip_interface: "eth0"
+
+# Log file for the Floating IP notify script (raw API bodies are NOT logged).
+cloud_floating_ip_log: /var/log/cloud-floating-ip.log
