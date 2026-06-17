@@ -22,8 +22,8 @@ Full variable reference for the HAProxy + Keepalived role. All variables are def
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `loadbalancer_master` | `""` | `inventory_hostname` of the master proxy node. **Required.** |
-| `loadbalancer_backup` | `""` | `inventory_hostname` of the backup proxy node. **Required.** |
+| `haproxy_loadbalancer_master` | `""` | `inventory_hostname` of the master proxy node. **Required.** |
+| `haproxy_loadbalancer_backup` | `""` | `inventory_hostname` of the backup proxy node. **Required.** |
 
 The master receives Keepalived priority 100, the backup receives 90. Both run HAProxy; only the master holds the VIP at any time.
 
@@ -264,8 +264,8 @@ floating_ip_address: "95.217.1.100"
 ### Full HA setup with HTTPS and health checks
 
 ```yaml
-loadbalancer_master: "proxy-01"
-loadbalancer_backup: "proxy-02"
+haproxy_loadbalancer_master: "proxy-01"
+haproxy_loadbalancer_backup: "proxy-02"
 
 keepalived_enabled: true
 keepalived_network_interface: eth0

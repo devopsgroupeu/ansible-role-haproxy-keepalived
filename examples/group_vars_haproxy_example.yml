@@ -16,8 +16,8 @@ haproxy_enabled: true
 haproxy_version: 3.1.4
 
 # Loadbalancer identification (used in keepalived router_id)
-loadbalancer_master: "proxy-master-hostname"
-loadbalancer_backup: "proxy-backup-hostname"
+haproxy_loadbalancer_master: "proxy-master-hostname"
+haproxy_loadbalancer_backup: "proxy-backup-hostname"
 
 # HAProxy Statistics Configuration
 haproxy_stats: true
@@ -175,6 +175,6 @@ keepalived_config_dir: /etc/keepalived
 # haproxy_stats_page_pass: "{{ vault_haproxy_stats_pass }}"
 #
 # Template Variables Used:
-# - loadbalancer_master / loadbalancer_backup (for keepalived router_id)
+# - haproxy_loadbalancer_master / haproxy_loadbalancer_backup (for keepalived router_id)
 # - keepalived_vrrp_instances (list of VRRP instances)
 # - keepalived_network_interface (network interface name)

@@ -28,8 +28,6 @@ provisioner:
       all:
         haproxy_loadbalancer_master: "proxy-ssl"
         haproxy_loadbalancer_backup: "proxy-ssl-b"
-        loadbalancer_master: "proxy-ssl"
-        loadbalancer_backup: "proxy-ssl-b"
         keepalived_enabled: false
         haproxy_stats_page_pass: "test_password_123456"
         haproxy_frontends:

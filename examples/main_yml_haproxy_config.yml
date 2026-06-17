@@ -14,8 +14,8 @@ haproxy_enabled: true
 haproxy_version: 3.1.4
 
 # Load balancer node identification
-loadbalancer_master: "proxy-master-hostname"
-loadbalancer_backup: "proxy-backup-hostname"
+haproxy_loadbalancer_master: "proxy-master-hostname"
+haproxy_loadbalancer_backup: "proxy-backup-hostname"
 
 # Stats page
 haproxy_stats: true
@@ -149,7 +149,7 @@ keepalived_config_dir: /etc/keepalived
 # 1. Copy this configuration to your group_vars/proxy.yml file
 # 2. Update virtual_ipaddress to your desired VIP
 # 3. Update keepalived_network_interface to match your server's network interface
-# 4. Update loadbalancer_master and loadbalancer_backup hostnames
+# 4. Update haproxy_loadbalancer_master and haproxy_loadbalancer_backup hostnames
 # 5. Choose your server specification method:
 #    a) Inventory groups: servers: "{{ groups['app_servers'] }}"
 #    b) Manual hostnames: servers: [app01, app02, app03]

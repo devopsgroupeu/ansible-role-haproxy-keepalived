@@ -263,8 +263,8 @@ The role will copy the tarballs from `files/` to the target servers instead of d
 Default configuration with one master, one backup:
 
 ```yaml
-loadbalancer_master: "proxy-01"
-loadbalancer_backup: "proxy-02"
+haproxy_loadbalancer_master: "proxy-01"
+haproxy_loadbalancer_backup: "proxy-02"
 ```
 
 ### Active-Active

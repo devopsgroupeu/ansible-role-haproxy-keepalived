@@ -58,8 +58,8 @@ provisioner:
   inventory:
     group_vars:
       all:
-        loadbalancer_master: "proxy-master"
-        loadbalancer_backup: "proxy-backup"
+        haproxy_loadbalancer_master: "proxy-master"
+        haproxy_loadbalancer_backup: "proxy-backup"
         haproxy_enabled: true
         haproxy_version: "3.4.0"
         haproxy_stats: true

@@ -9,21 +9,21 @@
 - name: Validate load balancer node identification
   ansible.builtin.assert:
     that:
-      - loadbalancer_master is defined
-      - loadbalancer_master | length > 0
-      - loadbalancer_backup is defined
-      - loadbalancer_backup | length > 0
-      - loadbalancer_master != loadbalancer_backup
+      - haproxy_loadbalancer_master is defined
+      - haproxy_loadbalancer_master | length > 0
+      - haproxy_loadbalancer_backup is defined
+      - haproxy_loadbalancer_backup | length > 0
+      - haproxy_loadbalancer_master != haproxy_loadbalancer_backup
     fail_msg: |
       Load balancer master and backup must be defined and different.
       Current values:
-        loadbalancer_master: '{{ loadbalancer_master }}'
-        loadbalancer_backup: '{{ loadbalancer_backup }}'
+        haproxy_loadbalancer_master: '{{ haproxy_loadbalancer_master }}'
+        haproxy_loadbalancer_backup: '{{ haproxy_loadbalancer_backup }}'
 
       Please set these variables to the inventory_hostname of your proxy nodes.
       Example:
-        loadbalancer_master: "proxy-master-01"
-        loadbalancer_backup: "proxy-backup-01"
+        haproxy_loadbalancer_master: "proxy-master-01"
+        haproxy_loadbalancer_backup: "proxy-backup-01"
     success_msg: "Load balancer identification validated successfully"
 
 - name: Validate HAProxy configuration
@@ -144,7 +144,7 @@
       - "=========================================="
       - "Configuration Validation Complete"
       - "=========================================="
-      - "Load Balancer Role: {{ 'MASTER' if inventory_hostname == loadbalancer_master else 'BACKUP' }}"
+      - "Load Balancer Role: {{ 'MASTER' if inventory_hostname == haproxy_loadbalancer_master else 'BACKUP' }}"
       - "HAProxy Enabled: {{ haproxy_enabled }}"
       - "HAProxy Version: {{ haproxy_version if haproxy_enabled else 'N/A' }}"
       - "Keepalived Enabled: {{ keepalived_enabled }}"

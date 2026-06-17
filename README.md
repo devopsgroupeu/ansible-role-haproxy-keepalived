@@ -76,8 +76,8 @@ app-03 ansible_host=10.0.1.12
   hosts: proxy_hosts
   become: true
   vars:
-    loadbalancer_master: "proxy-01"
-    loadbalancer_backup: "proxy-02"
+    haproxy_loadbalancer_master: "proxy-01"
+    haproxy_loadbalancer_backup: "proxy-02"
 
     keepalived_enabled: true
     keepalived_network_interface: "eth0"
@@ -176,7 +176,7 @@ the correct, deterministic behavior.
 
 ## Inventory Structure
 
-The role identifies the master and backup nodes by hostname using `loadbalancer_master` and `loadbalancer_backup`. Both nodes run HAProxy; Keepalived assigns the VIP to the master and fails over to the backup if the master goes down.
+The role identifies the master and backup nodes by hostname using `haproxy_loadbalancer_master` and `haproxy_loadbalancer_backup`. Both nodes run HAProxy; Keepalived assigns the VIP to the master and fails over to the backup if the master goes down.
 
 ---
 
@@ -188,8 +188,8 @@ The role identifies the master and backup nodes by hostname using `loadbalancer_
 |----------|---------|-------------|
 | `haproxy_enabled` | `true` | Install and configure HAProxy |
 | `haproxy_version` | `3.4.0` | HAProxy source version (source mode only; LTS even branch) |
-| `loadbalancer_master` | — | Hostname of the master proxy node |
-| `loadbalancer_backup` | — | Hostname of the backup proxy node |
+| `haproxy_loadbalancer_master` | — | Hostname of the master proxy node |
+| `haproxy_loadbalancer_backup` | — | Hostname of the backup proxy node |
 | `haproxy_mode` | `http` | Default proxy mode: `http` or `tcp` |
 | `haproxy_maxconn` | `3000` | Maximum simultaneous connections |
 | `haproxy_retries` | `3` | Connection retry attempts |

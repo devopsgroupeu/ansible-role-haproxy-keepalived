@@ -97,7 +97,7 @@ Expected: within ~3 seconds the backup should log `Entering MASTER state` and th
 
 - Firewall blocking VRRP traffic between nodes — allow protocol 112 (VRRP) and/or UDP 112 between proxy hosts.
 - With `keepalived_unicast: true`, check that `proxy_hosts` inventory group contains both nodes so the unicast peer list is correct.
-- `loadbalancer_master` / `loadbalancer_backup` set to wrong hostnames — they must match `inventory_hostname` exactly.
+- `haproxy_loadbalancer_master` / `haproxy_loadbalancer_backup` set to wrong hostnames — they must match `inventory_hostname` exactly.
 
 ---
 

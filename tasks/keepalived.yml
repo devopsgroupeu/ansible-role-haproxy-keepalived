@@ -79,7 +79,7 @@
 - name: Check VIP assignment on master node
   when:
     - keepalived_enabled | bool
-    - inventory_hostname == loadbalancer_master
+    - inventory_hostname == haproxy_loadbalancer_master
     - not (keepalived_nopreempt | bool)
   ansible.builtin.command: ip addr show
   register: vip_check

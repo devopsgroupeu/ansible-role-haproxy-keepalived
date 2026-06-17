@@ -10,11 +10,11 @@ argument_specs:
     author:
       - DevOpsGroup
     options:
-      loadbalancer_master:
+      haproxy_loadbalancer_master:
         type: str
         required: true
         description: inventory_hostname of the master proxy node.
-      loadbalancer_backup:
+      haproxy_loadbalancer_backup:
         type: str
         required: true
         description: inventory_hostname of the backup proxy node.

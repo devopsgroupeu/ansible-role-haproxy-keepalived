@@ -16,13 +16,13 @@
 #
 # REQUIRED: Both must be set for HA configuration
 # Example:
-#   loadbalancer_master: "proxy-master-01"
-#   loadbalancer_backup: "proxy-backup-01"
+#   haproxy_loadbalancer_master: "proxy-master-01"
+#   haproxy_loadbalancer_backup: "proxy-backup-01"
 #
 # The master node will receive priority 100, backup will receive priority 90
 
-loadbalancer_master: ""
-loadbalancer_backup: ""
+haproxy_loadbalancer_master: ""
+haproxy_loadbalancer_backup: ""
 
 # ============================================================================
 # HAProxy Configuration
@@ -403,7 +403,7 @@ keepalived_sync_groups: []
 #   - priority: Priority value for election (optional, default: auto-assigned)
 #     Higher priority becomes master. Auto-assignment: master=100, backup=90
 #   - state: Initial state MASTER or BACKUP (optional, default: auto-assigned)
-#     Usually auto-assigned based on loadbalancer_master/loadbalancer_backup
+#     Usually auto-assigned based on haproxy_loadbalancer_master/haproxy_loadbalancer_backup
 #
 # VRRP Instance Configuration:
 #   - Uses unicast communication (cloud-friendly, no multicast)

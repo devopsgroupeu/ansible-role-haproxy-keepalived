@@ -17,8 +17,8 @@
 # ============================================================================
 # Load Balancer Node Identification
 # ============================================================================
-loadbalancer_master: "proxy-01"  # Change to your master server name
-loadbalancer_backup: "proxy-02"  # Change to your backup server name
+haproxy_loadbalancer_master: "proxy-01"  # Change to your master server name
+haproxy_loadbalancer_backup: "proxy-02"  # Change to your backup server name
 
 # ============================================================================
 # HAProxy Configuration

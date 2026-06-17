@@ -16,11 +16,11 @@ vrrp_script haproxy_check {
 
 vrrp_instance {{ vrrp_instance.vrrp_instance_name }} {
   interface {{ keepalived_network_interface }}
-  priority {{ vrrp_instance.priority | default((inventory_hostname == loadbalancer_master) | ternary(100, 90)) }}
+  priority {{ vrrp_instance.priority | default((inventory_hostname == haproxy_loadbalancer_master) | ternary(100, 90)) }}
 {% if keepalived_nopreempt | bool %}
   state BACKUP
 {% else %}
-  state {{ vrrp_instance.state | default((inventory_hostname == loadbalancer_master) | ternary('MASTER', 'BACKUP')) }}
+  state {{ vrrp_instance.state | default((inventory_hostname == haproxy_loadbalancer_master) | ternary('MASTER', 'BACKUP')) }}
 {% endif %}
   virtual_router_id {{ vrrp_instance.virtual_router_id }}
   advert_int {{ vrrp_instance.advert_int | default(keepalived_advert_int) }}
