@@ -24,7 +24,7 @@ haproxy_loadbalancer_backup: "proxy-02"  # Change to your backup server name
 # HAProxy Configuration
 # ============================================================================
 haproxy_enabled: true
-haproxy_version: 3.1.4
+haproxy_version: 3.4.0
 
 # HAProxy user and group
 haproxy_user: haproxy
@@ -112,9 +112,7 @@ keepalived_vrrp_instances:
 cloud_floating_ip_enabled: true
 
 # Cloud API endpoint
-# Examples:
-#   - Cloud Cloud: https://api.hetzner.cloud/v1
-#   - DigitalOcean: https://api.digitalocean.com/v2
+# The built-in notify script targets Hetzner Cloud only.
 cloud_api_endpoint: "https://api.hetzner.cloud/v1"
 
 # Cloud API Token
@@ -124,7 +122,7 @@ cloud_api_endpoint: "https://api.hetzner.cloud/v1"
 cloud_api_token: "{{ vault_cloud_api_token }}"
 
 # Floating IP address
-floating_ip_address: "95.217.27.127"  # Change to your Floating IP
+cloud_floating_ip_address: "95.217.27.127"  # Change to your Hetzner Floating IP
 
 # Server name as registered in cloud provider
 # Defaults to inventory_hostname, override if different

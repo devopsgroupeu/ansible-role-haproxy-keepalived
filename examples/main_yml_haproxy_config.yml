@@ -11,7 +11,7 @@ haproxy_config: ""
 
 # HAProxy and Keepalived enable flags
 haproxy_enabled: true
-haproxy_version: 3.1.4
+haproxy_version: 3.4.0
 
 # Load balancer node identification
 haproxy_loadbalancer_master: "proxy-master-hostname"
@@ -138,7 +138,7 @@ keepalived_vrrp_instances:
     virtual_router_id: 100            # Must be unique per VRRP cluster
 
 # Directory configurations (defaults — override if needed)
-install_dir: /usr/local/src
+haproxy_install_dir: /usr/local/src
 haproxy_socket_dir: /var/lib/haproxy
 haproxy_config_dir: /etc/haproxy
 keepalived_config_dir: /etc/keepalived

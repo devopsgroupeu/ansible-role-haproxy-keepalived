@@ -69,7 +69,7 @@ haproxy_backends:
 cloud_floating_ip_enabled: true
 cloud_api_endpoint: "https://api.hetzner.cloud/v1"
 cloud_api_token: "{{ vault_cloud_api_token }}"
-floating_ip_address: "95.217.27.127"
+cloud_floating_ip_address: "95.217.27.127"
 cloud_server_name: "{{ inventory_hostname }}"
 ```
 
@@ -79,30 +79,12 @@ cloud_server_name: "{{ inventory_hostname }}"
 - Floating IP created
 - Servers in same private network
 
-### DigitalOcean
+### Other cloud providers
 
-**Configuration:**
-```yaml
-cloud_floating_ip_enabled: true
-cloud_api_endpoint: "https://api.digitalocean.com/v2"
-cloud_api_token: "{{ vault_cloud_api_token }}"
-floating_ip_address: "159.65.1.100"
-cloud_server_name: "{{ inventory_hostname }}"
-```
-
-**Note:** Modify `/usr/local/bin/cloud-floating-ip-notify.sh` for DigitalOcean API format.
-
-### AWS Elastic IP
-
-For AWS, use AWS CLI or boto3 instead of the generic script. Example integration with AWS:
-
-```bash
-# Install AWS CLI on servers
-apt install -y awscli
-
-# Configure IAM role with EC2 permissions
-# Modify notify script to use: aws ec2 associate-address
-```
+The built-in floating-IP notify script targets the Hetzner Cloud API only.
+For other providers (DigitalOcean, AWS Elastic IP, etc.) you must supply your
+own notify script — set `cloud_floating_ip_enabled: false` and call your
+custom script from a Keepalived `notify` stanza instead.
 
 ## Database Load Balancing
 
@@ -243,18 +225,29 @@ haproxy_backends:
 
 ## Air-Gapped Environments
 
-The role compiles HAProxy and Keepalived from source. In air-gapped environments where outbound internet access is blocked, pre-download the source tarballs and place them in the `files/` directory of the role before running:
+The role compiles HAProxy and Keepalived from source. In air-gapped environments
+where outbound internet access is blocked, pre-download the source tarballs on the
+Ansible controller and point the role at them with the offline variables:
 
 ```bash
-# On internet-connected machine
-wget https://www.haproxy.org/download/3.1/src/haproxy-3.1.4.tar.gz
+# On an internet-connected machine
+wget https://www.haproxy.org/download/3.4/src/haproxy-3.4.0.tar.gz
 wget https://www.keepalived.org/software/keepalived-2.3.2.tar.gz
-
-# Place in role files directory
-cp haproxy-3.1.4.tar.gz keepalived-2.3.2.tar.gz /path/to/role/files/
 ```
 
-The role will copy the tarballs from `files/` to the target servers instead of downloading them.
+```yaml
+# group_vars or host_vars
+haproxy_offline_install: true
+haproxy_src_local_path: "/path/on/controller/haproxy-3.4.0.tar.gz"
+
+keepalived_offline_install: true
+keepalived_src_local_path: "/path/on/controller/keepalived-2.3.2.tar.gz"
+```
+
+The role copies the tarballs from the controller path to `haproxy_install_dir` on
+the target servers and then proceeds with the normal compile/install flow.
+A checksum (`haproxy_src_sha256` / `keepalived_src_sha256`) is still required
+even in offline mode.
 
 ## High Availability Patterns
 

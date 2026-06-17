@@ -246,7 +246,7 @@ Optional integration that moves a cloud provider floating IP via API when VRRP s
 | `cloud_floating_ip_enabled` | `false` | Enable cloud floating IP management |
 | `cloud_api_endpoint` | `https://api.hetzner.cloud/v1` | Cloud provider API URL |
 | `cloud_api_token` | `""` | API token — **store in Ansible Vault** |
-| `floating_ip_address` | `""` | The floating IP to manage |
+| `cloud_floating_ip_address` | `""` | The floating IP to manage |
 | `cloud_server_name` | `{{ inventory_hostname }}` | Server identifier for API calls |
 | `cloud_floating_ip_interface` | `eth0` | Interface to assign floating IP to |
 
@@ -254,7 +254,7 @@ Optional integration that moves a cloud provider floating IP via API when VRRP s
 cloud_floating_ip_enabled: true
 cloud_api_endpoint: "https://api.hetzner.cloud/v1"
 cloud_api_token: "{{ vault_cloud_api_token }}"
-floating_ip_address: "95.217.1.100"
+cloud_floating_ip_address: "95.217.1.100"
 ```
 
 ---

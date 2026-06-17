@@ -91,6 +91,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Links
 
-- [Ansible Galaxy](https://galaxy.ansible.com/devopsgroup/haproxy_keepalived)
+- [Ansible Galaxy](https://galaxy.ansible.com/devopsgroupeu/haproxy_keepalived)
 - [GitLab Repository](https://gitlab.devopsgroup.sk/devopsgroupsk/on-premise-solution/ansible-roles/ansible-role-haproxy-keepalived)
 - [Issues](https://gitlab.devopsgroup.sk/devopsgroupsk/on-premise-solution/ansible-roles/ansible-role-haproxy-keepalived/issues)

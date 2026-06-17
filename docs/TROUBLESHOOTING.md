@@ -185,9 +185,9 @@ curl -H "Authorization: Bearer <token>" https://api.hetzner.cloud/v1/floating_ip
 **Common causes:**
 
 - `cloud_api_token` not set or expired — store in Ansible Vault and verify it works with a manual API call.
-- `floating_ip_address` not matching the actual cloud floating IP — verify in your cloud provider console.
-- Firewall on proxy nodes blocking outbound HTTPS to the cloud API endpoint.
-- Wrong `cloud_api_endpoint` — verify the URL for your provider (Hetzner vs DigitalOcean vs other).
+- `cloud_floating_ip_address` not matching the actual Hetzner floating IP — verify in the Hetzner Cloud console.
+- Firewall on proxy nodes blocking outbound HTTPS to the Hetzner Cloud API endpoint.
+- Wrong `cloud_api_endpoint` — the built-in script targets Hetzner Cloud (`https://api.hetzner.cloud/v1`) only.
 
 ---
 
