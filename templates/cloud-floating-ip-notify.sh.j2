@@ -13,9 +13,13 @@
 
 set -euo pipefail
 
-# Configuration
-CLOUD_API_TOKEN="{{ cloud_api_token }}"
-FLOATING_IP="{{ floating_ip_address }}"
+# Configuration — secrets live in a 0600 env file, not in this script body
+ENV_FILE="{{ keepalived_config_dir }}/cloud-floating-ip.env"
+if [ -r "$ENV_FILE" ]; then
+    # shellcheck disable=SC1090
+    . "$ENV_FILE"
+fi
+FLOATING_IP="{{ cloud_floating_ip_address }}"
 FLOATING_IP_INTERFACE="{{ cloud_floating_ip_interface }}"
 SERVER_NAME="{{ cloud_server_name }}"
 API_ENDPOINT="{{ cloud_api_endpoint }}"

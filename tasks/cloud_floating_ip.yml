@@ -11,15 +11,27 @@
     that:
       - cloud_api_token is defined
       - cloud_api_token | length > 0
-      - floating_ip_address is defined
-      - floating_ip_address | length > 0
+      - cloud_floating_ip_address is defined
+      - cloud_floating_ip_address | length > 0
       - cloud_api_endpoint is defined
       - cloud_api_endpoint | length > 0
     fail_msg: |
       Cloud Floating IP is enabled but required variables are missing.
-      Required: cloud_api_token, floating_ip_address, cloud_api_endpoint
+      Required: cloud_api_token, cloud_floating_ip_address, cloud_api_endpoint
       Store API token in Ansible Vault for security!
     success_msg: "Cloud Floating IP configuration validated"
+
+- name: Deploy cloud Floating IP env file (token)
+  ansible.builtin.copy:
+    dest: "{{ keepalived_config_dir }}/cloud-floating-ip.env"
+    content: |
+      CLOUD_API_TOKEN={{ cloud_api_token }}
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  become: true
+  notify: Restart keepalived
 
 - name: Install curl for API calls
   ansible.builtin.package:
@@ -99,6 +111,13 @@
       WantedBy=multi-user.target
   become: true
   notify: Reload systemd and enable floating IP service
+
+- name: Assert deployed notify script is credential-free
+  ansible.builtin.command: >-
+    grep -L "CLOUD_API_TOKEN=" /usr/local/bin/cloud-floating-ip-notify.sh
+  register: script_token_grep
+  changed_when: false
+  failed_when: script_token_grep.stdout | length == 0
 
 - name: Warn if API test failed
   ansible.builtin.fail:

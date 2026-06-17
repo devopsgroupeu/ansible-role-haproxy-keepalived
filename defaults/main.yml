@@ -391,9 +391,9 @@ cloud_api_endpoint: "https://api.hetzner.cloud/v1"
 # Example: cloud_api_token: "{{ vault_cloud_api_token }}"
 cloud_api_token: ""
 
-# Floating IP address to manage
-# Example: floating_ip_address: "95.217.27.127"
-floating_ip_address: ""
+# Floating IP address to manage (Hetzner Cloud only — see README)
+# Example: cloud_floating_ip_address: "95.217.27.127"
+cloud_floating_ip_address: ""
 
 # Server name/identifier for API calls
 # Defaults to inventory_hostname
