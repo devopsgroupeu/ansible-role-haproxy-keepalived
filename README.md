@@ -47,6 +47,10 @@ Ansible role that installs and configures **HAProxy** and **Keepalived** for hig
 - Two proxy nodes for HA (one master, one backup)
 - Supported OS: Ubuntu 22.04 / 24.04, Debian 12, Rocky Linux 9, Oracle Linux 9, RHEL 9
 
+**Version policy:** in source mode the role tracks HAProxy **LTS** branches
+(even-numbered: 3.0/3.2/3.4). The default is the newest LTS (`3.4.0`). In
+package mode the version follows the distribution / configured repo.
+
 ---
 
 ## Quick Start
@@ -182,7 +186,7 @@ The role identifies the master and backup nodes by hostname using `loadbalancer_
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `haproxy_enabled` | `true` | Install and configure HAProxy |
-| `haproxy_version` | `3.1.4` | HAProxy version to install |
+| `haproxy_version` | `3.4.0` | HAProxy source version (source mode only; LTS even branch) |
 | `loadbalancer_master` | — | Hostname of the master proxy node |
 | `loadbalancer_backup` | — | Hostname of the backup proxy node |
 | `haproxy_mode` | `http` | Default proxy mode: `http` or `tcp` |
@@ -233,7 +237,7 @@ haproxy_backends:
 
 ```yaml
 keepalived_enabled: true
-keepalived_version: 2.3.2
+keepalived_version: 2.3.4
 keepalived_network_interface: eth0   # Interface to bind the VIP to
 
 keepalived_vrrp_instances:

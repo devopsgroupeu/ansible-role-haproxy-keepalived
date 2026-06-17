@@ -31,10 +31,11 @@ loadbalancer_backup: ""
 # Enable/disable HAProxy installation and configuration
 haproxy_enabled: true
 
-# HAProxy version to install (must be available from haproxy.org)
-# Minimum supported version: 2.0
+# HAProxy version to compile when haproxy_install_method=source.
+# LTS policy: even-numbered branches only (3.0/3.2/3.4...). Default is the
+# newest LTS. Package mode is distro-driven and ignores this var.
 # Check available versions: https://www.haproxy.org/download/
-haproxy_version: 3.1.4
+haproxy_version: "3.4.0"
 
 # Complete HAProxy configuration as a string (alternative to individual parameters)
 # If set, this will be used instead of the dynamically generated configuration
@@ -260,7 +261,7 @@ keepalived_enabled: true
 
 # Keepalived version to install (minimum supported: 2.0)
 # Check available versions: https://www.keepalived.org/download.html
-keepalived_version: 2.3.2
+keepalived_version: "2.3.4"
 
 # Syslog facility for Keepalived logging (local0-local7).
 # Set via a systemd drop-in (-S flag); the source-built unit does not read

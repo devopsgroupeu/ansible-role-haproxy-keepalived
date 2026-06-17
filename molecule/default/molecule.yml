@@ -61,11 +61,11 @@ provisioner:
         loadbalancer_master: "proxy-master"
         loadbalancer_backup: "proxy-backup"
         haproxy_enabled: true
-        haproxy_version: 3.1.4
+        haproxy_version: "3.4.0"
         haproxy_stats: true
         haproxy_stats_page_pass: "test_password_123"
         keepalived_enabled: true
-        keepalived_version: 2.3.2
+        keepalived_version: "2.3.4"
         keepalived_network_interface: eth0
         keepalived_vrrp_instances:
           - vrrp_instance_name: VI_TEST
