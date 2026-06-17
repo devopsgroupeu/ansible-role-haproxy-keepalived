@@ -1,0 +1,52 @@
+global_defs {
+  router_id {{ inventory_hostname }}
+  enable_script_security
+  script_user root
+}
+
+vrrp_script haproxy_check {
+  script "service haproxy status"
+  timeout 2
+  interval 2
+  weight 2
+  fall 2
+  rise 2
+}
+
+{% for vrrp_instance in keepalived_vrrp_instances %}
+
+vrrp_instance {{ vrrp_instance.vrrp_instance_name }} {
+  interface {{ keepalived_network_interface }}
+  priority {{ vrrp_instance.priority | default((inventory_hostname == loadbalancer_master) | ternary(100, 90)) }}
+  state {{ vrrp_instance.state | default((inventory_hostname == loadbalancer_master) | ternary('MASTER', 'BACKUP')) }}
+  virtual_router_id {{ vrrp_instance.virtual_router_id }}
+
+{% if keepalived_unicast | default(true) %}
+  # Use unicast mode for environments where multicast is not available (e.g. cloud)
+  unicast_src_ip {{ hostvars[inventory_hostname]['ansible_' + keepalived_network_interface]['ipv4']['address'] | default(ansible_default_ipv4.address) }}
+  unicast_peer {
+{% for host in groups['proxy_hosts'] %}
+{% if host != inventory_hostname %}
+    {{ hostvars[host]['ansible_' + keepalived_network_interface]['ipv4']['address'] | default(hostvars[host]['ansible_default_ipv4']['address']) }}
+{% endif %}
+{% endfor %}
+  }
+{% endif %}
+
+  virtual_ipaddress {
+    {{ vrrp_instance.virtual_ipaddress }}
+  }
+
+  track_script {
+      haproxy_check
+  }
+
+{% if cloud_floating_ip_enabled | default(false) %}
+  # Cloud Floating IP API integration
+  notify_master "/usr/local/bin/cloud-floating-ip-notify.sh MASTER"
+  notify_backup "/usr/local/bin/cloud-floating-ip-notify.sh BACKUP"
+  notify_fault "/usr/local/bin/cloud-floating-ip-notify.sh FAULT"
+{% endif %}
+}
+
+{% endfor %}

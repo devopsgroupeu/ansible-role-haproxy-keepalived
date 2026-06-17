@@ -1,0 +1,186 @@
+---
+- name: Check HAProxy installation status
+  block:
+    - name: Get installed HAProxy version
+      ansible.builtin.command: haproxy -v
+      register: haproxy_installed
+      changed_when: false
+      ignore_errors: true
+      check_mode: false
+
+    - name: Extract HAProxy version from output
+      ansible.builtin.set_fact:
+        installed_haproxy_version: "{{ (haproxy_installed.stdout | regex_search('HAProxy version (\\d+\\.\\d+\\.\\d+)', '\\1') | default([''], true)) | first }}"
+      when:
+        - haproxy_installed.rc == 0
+        - haproxy_installed.stdout | length > 0
+  rescue:
+    - name: Set empty HAProxy version if not installed
+      ansible.builtin.set_fact:
+        installed_haproxy_version: ""
+
+- name: Determine if HAProxy installation is required
+  ansible.builtin.set_fact:
+    haproxy_installation_required: >-
+      {{ installed_haproxy_version | default('') != haproxy_version }}
+
+- name: Install HAProxy if required
+  when: haproxy_installation_required
+  block:
+    - name: Set variables
+      ansible.builtin.set_fact:
+        haproxy_major_minor: "{{ haproxy_version | regex_replace('^(\\d+\\.\\d+).*', '\\1') }}"
+        haproxy_src_filename: "haproxy-{{ haproxy_version }}.tar.gz"
+
+    - name: Download HAProxy source
+      ansible.builtin.get_url:
+        url: "https://www.haproxy.org/download/{{ haproxy_major_minor }}/src/{{ haproxy_src_filename }}"
+        dest: "{{ playbook_dir }}/{{ haproxy_src_filename }}"
+        mode: "0644"
+      delegate_to: localhost
+      become: false
+      run_once: true
+
+    - name: Copy HAProxy source to target
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/{{ haproxy_src_filename }}"
+        dest: "{{ install_dir }}/{{ haproxy_src_filename }}"
+        mode: "0644"
+      notify:
+        - Restart haproxy
+
+    - name: Remove HAProxy local source file
+      ansible.builtin.file:
+        path: "{{ playbook_dir }}/{{ haproxy_src_filename }}"
+        state: absent
+      delegate_to: localhost
+      run_once: true
+      become: false
+
+    - name: Extract HAProxy source
+      ansible.builtin.unarchive:
+        src: "{{ install_dir }}/{{ haproxy_src_filename }}"
+        dest: "{{ install_dir }}"
+        remote_src: true
+        creates: "{{ install_dir }}/haproxy-{{ haproxy_version }}/Makefile"
+
+    - name: Compile HAProxy
+      ansible.builtin.command:
+        cmd: >-
+          make TARGET=linux-glibc
+          USE_OPENSSL=1 USE_PCRE2=1 USE_LUA=1
+          USE_SLZ=1 USE_SYSTEMD=1 USE_PROMEX=1
+          USE_PCRE2_JIT=1 USE_QUIC=1 USE_QUIC_OPENSSL_COMPAT=1
+      args:
+        chdir: "{{ install_dir }}/haproxy-{{ haproxy_version }}"
+        creates: "{{ install_dir }}/haproxy-{{ haproxy_version }}/haproxy"
+      register: haproxy_compile
+      changed_when: haproxy_compile.rc == 0
+
+    - name: Install HAProxy binaries
+      ansible.builtin.command:
+        cmd: make install
+      args:
+        chdir: "{{ install_dir }}/haproxy-{{ haproxy_version }}"
+      register: haproxy_install
+      changed_when: haproxy_install.rc == 0
+      when: haproxy_compile is changed
+
+    - name: Generate systemd service HAProxy file
+      ansible.builtin.command:
+        cmd: make haproxy.service
+      args:
+        chdir: "{{ install_dir }}/haproxy-{{ haproxy_version }}/admin/systemd"
+        creates: "{{ install_dir }}/haproxy-{{ haproxy_version }}/admin/systemd/haproxy.service"
+      register: haproxy_systemd_gen
+      changed_when: haproxy_systemd_gen.rc == 0
+
+    - name: Deploy HAProxy systemd service
+      ansible.builtin.copy:
+        src: "{{ install_dir }}/haproxy-{{ haproxy_version }}/admin/systemd/haproxy.service"
+        dest: /etc/systemd/system/haproxy.service
+        mode: "0644"
+        remote_src: true
+      notify: Reload systemd
+
+- name: Create certificate directory
+  ansible.builtin.file:
+    path: /etc/haproxy/certs
+    state: directory
+    owner: root
+    group: haproxy
+    mode: "0750"
+
+- name: Deploy SSL certificates
+  ansible.builtin.copy:
+    src: certs/
+    dest: /etc/haproxy/certs/
+    owner: root
+    group: haproxy
+    mode: "0640"
+
+- name: Create HAProxy socket directory
+  ansible.builtin.file:
+    path: "{{ haproxy_socket_dir }}"
+    state: directory
+    owner: root
+    group: haproxy
+    mode: "0750"
+
+- name: Copy HAProxy configuration
+  ansible.builtin.template:
+    src: haproxy.cfg.j2
+    dest: "{{ haproxy_config_dir }}/haproxy.cfg"
+    mode: "0644"
+    validate: haproxy -f %s -c
+    backup: true
+  notify:
+    - Restart haproxy
+    - Cleanup haproxy config backups
+
+- name: Configure the rsyslog configuration file to accept UDP syslog reception
+  ansible.builtin.copy:
+    dest: "/etc/rsyslog.d/haproxy.conf"
+    mode: "0644"
+    content: |
+      # Provides UDP syslog reception
+      $ModLoad imudp
+      $UDPServerAddress 127.0.0.1
+      $UDPServerRun 514
+
+      # Creating separate log files based on the severity
+      local0.* /var/log/haproxy-traffic.log
+      local0.notice /var/log/haproxy-admin.log
+  notify: Restart rsyslog
+
+- name: Ensure HAProxy service is running
+  ansible.builtin.systemd_service:
+    name: haproxy
+    state: started
+    enabled: true
+
+- name: Wait for HAProxy to be ready
+  ansible.builtin.wait_for:
+    port: "{{ haproxy_stats_port }}"
+    delay: 2
+    timeout: 30
+  when: haproxy_stats | bool
+
+- name: Verify HAProxy is responding
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ haproxy_stats_port }}{{ haproxy_stats_page_uri }}"
+    user: "{{ haproxy_stats_page_user }}"
+    password: "{{ haproxy_stats_page_pass }}"
+    force_basic_auth: true
+    status_code: 200
+  when: haproxy_stats | bool
+  retries: 3
+  delay: 2
+  register: haproxy_stats_check
+  until: haproxy_stats_check is succeeded
+
+- name: Check HAProxy process is running
+  ansible.builtin.command: pgrep -x haproxy
+  register: haproxy_process
+  changed_when: false
+  failed_when: haproxy_process.rc != 0

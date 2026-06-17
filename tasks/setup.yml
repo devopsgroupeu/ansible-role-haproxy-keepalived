@@ -1,0 +1,75 @@
+---
+- name: Create HAProxy group
+  ansible.builtin.group:
+    name: "{{ haproxy_group }}"
+    system: true
+    state: present
+
+- name: Create HAProxy user
+  ansible.builtin.user:
+    name: "{{ haproxy_user }}"
+    group: "{{ haproxy_group }}"
+    system: true
+    state: present
+    shell: /sbin/nologin
+    home: "{{ haproxy_socket_dir }}"
+    create_home: false
+
+- name: Install Prerequisites on RHEL/CentOS/Rocky Linux
+  ansible.builtin.package:
+    name:
+      - vim
+      - make
+      - gcc
+      - lua-devel
+      - openssl-devel
+      - libnl3-devel
+      - pcre2-devel
+      - zlib-devel
+      - net-snmp-devel
+      - curl
+      - wget
+      - python3
+      - rsyslog
+    state: present
+  when:
+    - ansible_facts['distribution'] == "OracleLinux" or ansible_facts['distribution'] == "RedHat" or ansible_facts['distribution'] == "Rocky"
+
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  when:
+    - ansible_facts['distribution'] == "Debian" or ansible_facts['distribution'] == "Ubuntu"
+
+- name: Install Prerequisites on Debian/Ubuntu
+  ansible.builtin.package:
+    name:
+      - vim
+      - make
+      - build-essential
+      - gcc
+      - liblua5.4-dev
+      - libssl-dev
+      - libnl-3-dev
+      - libnl-genl-3-dev
+      - libsnmp-dev
+      - libpcre2-dev
+      - zlib1g-dev
+      - curl
+      - wget
+      - python3
+      - rsyslog
+    state: present
+  when:
+    - ansible_facts['distribution'] == "Debian" or ansible_facts['distribution'] == "Ubuntu"
+
+- name: Enabling Non-Local Binding
+  ansible.builtin.lineinfile:
+    path: /etc/sysctl.conf
+    line: net.ipv4.ip_nonlocal_bind=1
+
+- name: For the kernel to pick up the new changes without rebooting
+  ansible.builtin.command:
+    cmd: sysctl -p
+  changed_when: false

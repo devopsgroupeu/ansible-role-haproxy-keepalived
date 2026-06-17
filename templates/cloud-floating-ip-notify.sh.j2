@@ -1,0 +1,145 @@
+#!/bin/bash
+#
+# Cloud Floating IP Failover Script
+# Automatically assigns cloud Floating IP to the current MASTER server
+#
+# This script is called by Keepalived when VRRP state changes
+# Part of: ansible-role-haproxy-keepalived
+#
+# Supported providers:
+#   - Hetzner Cloud (default API implementation)
+#   - Custom provider (adapt API calls)
+#
+
+set -euo pipefail
+
+# Configuration
+CLOUD_API_TOKEN="{{ cloud_api_token }}"
+FLOATING_IP="{{ floating_ip_address }}"
+FLOATING_IP_INTERFACE="{{ cloud_floating_ip_interface }}"
+SERVER_NAME="{{ cloud_server_name }}"
+API_ENDPOINT="{{ cloud_api_endpoint }}"
+
+# Logging
+LOG_FILE="/var/log/cloud-floating-ip.log"
+
+log() {
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"
+}
+
+# Validate configuration
+if [ -z "$CLOUD_API_TOKEN" ]; then
+    log "ERROR: CLOUD_API_TOKEN not set"
+    exit 1
+fi
+
+if [ -z "$FLOATING_IP" ]; then
+    log "ERROR: FLOATING_IP not set"
+    exit 1
+fi
+
+if [ -z "$SERVER_NAME" ]; then
+    log "ERROR: SERVER_NAME not set"
+    exit 1
+fi
+
+if [ -z "$API_ENDPOINT" ]; then
+    log "ERROR: API_ENDPOINT not set"
+    exit 1
+fi
+
+if ! command -v curl &> /dev/null; then
+    log "ERROR: curl not found - required for cloud API calls"
+    exit 1
+fi
+
+# Get VRRP state from Keepalived
+STATE="${1:-UNKNOWN}"
+
+log "Keepalived state transition: $STATE on server $SERVER_NAME"
+
+assign_floating_ip() {
+    # Step 1: Get server ID
+    SERVER_RESPONSE=$(curl -s -H "Authorization: Bearer $CLOUD_API_TOKEN" \
+        "${API_ENDPOINT}/servers?name=${SERVER_NAME}")
+
+    SERVER_ID=$(echo "$SERVER_RESPONSE" | grep -o '"id": *[0-9]*' | head -1 | tr -dc '0-9')
+
+    if [ -z "$SERVER_ID" ]; then
+        log "ERROR: Could not find server ID for $SERVER_NAME"
+        log "API Response: $SERVER_RESPONSE"
+        exit 1
+    fi
+
+    log "Found server ID: $SERVER_ID"
+
+    # Step 2: Get Floating IP ID
+    FIP_RESPONSE=$(curl -s -H "Authorization: Bearer $CLOUD_API_TOKEN" \
+        "${API_ENDPOINT}/floating_ips?ip=${FLOATING_IP}")
+
+    FIP_ID=$(echo "$FIP_RESPONSE" | grep -o '"id": *[0-9]*' | head -1 | tr -dc '0-9')
+
+    if [ -z "$FIP_ID" ]; then
+        log "ERROR: Could not find Floating IP ID for ${FLOATING_IP}"
+        log "API Response: $FIP_RESPONSE"
+        exit 1
+    fi
+
+    log "Found Floating IP ID: $FIP_ID"
+
+    # Step 3: Assign Floating IP to this server via API
+    ASSIGN_RESPONSE=$(curl -s -X POST \
+        -H "Authorization: Bearer $CLOUD_API_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d "{\"server\": $SERVER_ID}" \
+        "${API_ENDPOINT}/floating_ips/${FIP_ID}/actions/assign")
+
+    if echo "$ASSIGN_RESPONSE" | grep -q '"action"'; then
+        log "SUCCESS: Floating IP $FLOATING_IP assigned to $SERVER_NAME via API"
+    else
+        log "ERROR: Failed to assign Floating IP via API"
+        log "Response: $ASSIGN_RESPONSE"
+        exit 1
+    fi
+}
+
+add_floating_ip_to_interface() {
+    if ! ip addr show "$FLOATING_IP_INTERFACE" | grep -q "$FLOATING_IP"; then
+        ip addr add "${FLOATING_IP}/32" dev "$FLOATING_IP_INTERFACE"
+        log "Added $FLOATING_IP/32 to interface $FLOATING_IP_INTERFACE"
+    else
+        log "$FLOATING_IP already configured on $FLOATING_IP_INTERFACE"
+    fi
+}
+
+remove_floating_ip_from_interface() {
+    if ip addr show "$FLOATING_IP_INTERFACE" | grep -q "$FLOATING_IP"; then
+        ip addr del "${FLOATING_IP}/32" dev "$FLOATING_IP_INTERFACE"
+        log "Removed $FLOATING_IP/32 from interface $FLOATING_IP_INTERFACE"
+    fi
+}
+
+case "$STATE" in
+    MASTER)
+        log "Transitioning to MASTER - assigning Floating IP $FLOATING_IP to $SERVER_NAME"
+        assign_floating_ip
+        add_floating_ip_to_interface
+        log "MASTER setup complete - Floating IP $FLOATING_IP is active on $SERVER_NAME"
+        ;;
+
+    BACKUP)
+        log "Transitioning to BACKUP - removing Floating IP from local interface"
+        remove_floating_ip_from_interface
+        ;;
+
+    FAULT)
+        log "Keepalived entered FAULT state on $SERVER_NAME - removing Floating IP from local interface"
+        remove_floating_ip_from_interface
+        ;;
+
+    *)
+        log "Unknown state: $STATE"
+        ;;
+esac
+
+exit 0

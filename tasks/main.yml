@@ -1,0 +1,27 @@
+---
+- name: Validate configuration variables
+  ansible.builtin.import_tasks: validate.yml
+  tags: always
+
+- name: Setup VMs
+  ansible.builtin.import_tasks: setup.yml
+  tags: setup
+
+- name: Install and start HAproxy
+  ansible.builtin.import_tasks: haproxy.yml
+  when: haproxy_enabled | bool
+  tags: haproxy
+
+- name: Install and start Keepalived
+  ansible.builtin.import_tasks: keepalived.yml
+  when: keepalived_enabled | bool
+  tags: keepalived
+
+- name: Configure cloud Floating IP API integration
+  ansible.builtin.import_tasks: cloud_floating_ip.yml
+  when:
+    - keepalived_enabled | bool
+    - cloud_floating_ip_enabled | bool
+  tags:
+    - keepalived
+    - cloud

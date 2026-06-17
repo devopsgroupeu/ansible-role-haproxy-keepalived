@@ -1,0 +1,57 @@
+---
+# ============================================================================
+# Molecule Converge Playbook
+# ============================================================================
+# This playbook is used by Molecule to test the role installation
+# ============================================================================
+
+- name: Converge
+  hosts: all
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Update apt cache (Debian/Ubuntu)
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+      when: ansible_os_family == 'Debian'
+      changed_when: false
+
+    - name: Update yum cache (RedHat)
+      ansible.builtin.yum:
+        update_cache: true
+      when: ansible_os_family == 'RedHat'
+      changed_when: false
+
+- name: Install nginx on backend servers
+  hosts: backend_servers
+  become: true
+  tasks:
+    - name: Install nginx
+      ansible.builtin.package:
+        name: nginx
+        state: present
+
+    - name: Start nginx
+      ansible.builtin.service:
+        name: nginx
+        state: started
+        enabled: true
+
+    - name: Create test page
+      ansible.builtin.copy:
+        dest: /var/www/html/index.html
+        content: |
+          <html>
+          <head><title>Test Backend</title></head>
+          <body><h1>Backend Server: {{ inventory_hostname }}</h1></body>
+          </html>
+        mode: "0644"
+
+- name: Apply HAProxy + Keepalived role
+  hosts: proxy_hosts
+  become: true
+  tasks:
+    - name: Include role
+      ansible.builtin.include_role:
+        name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}"

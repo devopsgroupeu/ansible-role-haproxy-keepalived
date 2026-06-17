@@ -1,0 +1,187 @@
+---
+# ============================================================================
+# Cloud Provider with Floating IP - Example Configuration
+# ============================================================================
+# This example shows how to deploy HAProxy + Keepalived on Cloud Provider
+# with automatic Floating IP failover integration.
+#
+# Architecture:
+#   Internet → Floating IP (95.217.27.127) → Active HAProxy Server
+#                                              ↓
+#                                    Private VIP (10.0.0.100)
+#                                    VRRP manages failover
+#                                              ↓
+#                                      Backend Services
+# ============================================================================
+
+# ============================================================================
+# Load Balancer Node Identification
+# ============================================================================
+loadbalancer_master: "proxy-01"  # Change to your master server name
+loadbalancer_backup: "proxy-02"  # Change to your backup server name
+
+# ============================================================================
+# HAProxy Configuration
+# ============================================================================
+haproxy_enabled: true
+haproxy_version: 3.1.4
+
+# HAProxy user and group
+haproxy_user: haproxy
+haproxy_group: haproxy
+
+# Stats page configuration
+haproxy_stats_page_enabled: true
+haproxy_stats_page_port: 1936
+haproxy_stats_page_uri: "/haproxy/stats"
+haproxy_stats_page_user: "admin"
+haproxy_stats_page_pass: "{{ vault_haproxy_stats_password }}"  # Store in vault!
+
+# Frontend configuration
+haproxy_frontends:
+  - name: http_frontend
+    address: "*"
+    port: 80
+    default_backend: web_backend
+    mode: http
+    options:
+      - forwardfor
+      - httplog
+
+  - name: https_frontend
+    address: "*"
+    port: 443
+    default_backend: web_backend
+    mode: http
+    options:
+      - forwardfor
+      - httplog
+    # Uncomment for SSL/TLS:
+    # bind_options:
+    #   - ssl
+    #   - crt /etc/haproxy/certs/certificate.pem
+
+# Backend configuration
+haproxy_backends:
+  - name: web_backend
+    balance: roundrobin
+    mode: http
+    servers:
+      - web01.example.com  # Replace with your backend servers
+      - web02.example.com
+      - web03.example.com
+    port: 8080
+    options:
+      - check
+      - inter 2s
+      - rise 2
+      - fall 3
+    # Cookie-based session persistence (optional)
+    # cookie: SERVERID insert indirect nocache
+
+# ============================================================================
+# Keepalived Configuration
+# ============================================================================
+keepalived_enabled: true
+keepalived_version: 2.3.2
+
+# Network interface for VRRP (check with 'ip a' on your servers)
+# Cloud Provider typically uses: ens3
+# Cloud Dedicated typically uses: eth0, enp0s31f6, etc.
+keepalived_network_interface: "ens3"
+
+# VRRP configuration
+# Use unicast mode (required for cloud environments)
+keepalived_vrrp_unicast: true
+
+# VRRP instances
+keepalived_vrrp_instances:
+  - vrrp_instance_name: VI_1
+    # Private network VIP (managed by VRRP)
+    # This IP must be in the same subnet as your private network
+    virtual_ipaddress: "10.0.0.100"  # Change to your private network range
+    virtual_router_id: 51  # Must be unique in your network (1-255)
+    # Optional: Override priorities (default: master=100, backup=90)
+    # priority_master: 100
+    # priority_backup: 90
+
+# ============================================================================
+# Cloud Provider Floating IP Integration
+# ============================================================================
+# Enable automatic Floating IP failover via cloud API
+cloud_floating_ip_enabled: true
+
+# Cloud API endpoint
+# Examples:
+#   - Cloud Cloud: https://api.hetzner.cloud/v1
+#   - DigitalOcean: https://api.digitalocean.com/v2
+cloud_api_endpoint: "https://api.hetzner.cloud/v1"
+
+# Cloud API Token
+# ⚠️  SECURITY: Store in Ansible Vault!
+# Generate from your cloud provider console
+# Permissions: Read & Write
+cloud_api_token: "{{ vault_cloud_api_token }}"
+
+# Floating IP address
+floating_ip_address: "95.217.27.127"  # Change to your Floating IP
+
+# Server name as registered in cloud provider
+# Defaults to inventory_hostname, override if different
+# cloud_server_name: "{{ inventory_hostname }}"
+
+# ============================================================================
+# Optional: Rsyslog for Centralized Logging
+# ============================================================================
+# Uncomment to enable rsyslog configuration
+# haproxy_rsyslog_enabled: true
+# haproxy_rsyslog_server: "syslog.example.com"
+# haproxy_rsyslog_port: 514
+
+# keepalived_rsyslog_enabled: true
+# keepalived_rsyslog_server: "syslog.example.com"
+# keepalived_rsyslog_port: 514
+
+# ============================================================================
+# Usage Instructions
+# ============================================================================
+# 1. Create vault.yml with your secrets:
+#    cp vault.example.yml vault.yml
+#    # Add your actual API token and passwords
+#    ansible-vault encrypt vault.yml
+#
+# 2. Create inventory.ini:
+#    [proxy_hosts]
+#    proxy-01 ansible_host=89.167.7.98 ansible_user=root
+#    proxy-02 ansible_host=X.X.X.X ansible_user=root
+#
+# 3. Create playbook.yml:
+#    ---
+#    - name: Deploy HAProxy + Keepalived on Cloud
+#      hosts: proxy_hosts
+#      become: true
+#      vars_files:
+#        - vault.yml
+#      vars:
+#        # Include variables from this file
+#        - cloud_floating_ip_enabled: true
+#        # ... (copy vars from above)
+#      roles:
+#        - ansible-role-haproxy-keepalived
+#
+# 4. Run playbook:
+#    ansible-playbook -i inventory.ini playbook.yml --ask-vault-pass
+#
+# 5. Test failover:
+#    # Stop keepalived on master
+#    ssh proxy-01 'systemctl stop keepalived'
+#
+#    # Check Floating IP moved to backup
+#    # Visit: http://95.217.27.127
+#    # Check Cloud Console: Floating IP should be on proxy-02
+#
+#    # Restart master
+#    ssh proxy-01 'systemctl start keepalived'
+#
+#    # Floating IP should return to master (higher priority)
+# ============================================================================

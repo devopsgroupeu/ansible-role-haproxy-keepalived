@@ -1,0 +1,42 @@
+---
+# ============================================================================
+# Molecule Prepare Playbook
+# ============================================================================
+# This playbook prepares the test environment before running the role
+# ============================================================================
+
+- name: Prepare test environment
+  hosts: all
+  become: false
+  gather_facts: true
+  tasks:
+    - name: Fix PAM authentication for Rocky Linux
+      ansible.builtin.lineinfile:
+        path: /etc/pam.d/su
+        regexp: '^account\s+required\s+pam_access.so'
+        state: absent
+      become: true
+      when: ansible_os_family == 'RedHat'
+      failed_when: false
+
+    - name: Install basic requirements (Debian/Ubuntu)
+      ansible.builtin.package:
+        name:
+          - iproute2
+        state: present
+      become: true
+      when: ansible_os_family == 'Debian'
+
+    - name: Install basic requirements (Rocky/RHEL)
+      ansible.builtin.package:
+        name:
+          - iproute
+        state: present
+      become: true
+      when: ansible_os_family == 'RedHat'
+
+    - name: Ensure systemd is running
+      ansible.builtin.service:
+        name: systemd-journald
+        state: started
+      become: true

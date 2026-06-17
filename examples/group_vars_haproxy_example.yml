@@ -1,0 +1,180 @@
+---
+# Example HAProxy + Keepalived configuration
+# This file shows how to configure HAProxy with frontends, backends, and Keepalived
+# Copy relevant parts to your group_vars/proxy.yml file
+
+# ===============================================================================
+# HAPROXY + KEEPALIVED CONFIGURATION EXAMPLE
+# ===============================================================================
+
+# Complete HAProxy configuration as a string (alternative to individual parameters)
+# If set, this will be used instead of individual parameters
+haproxy_config: ""
+
+# Enable HAProxy and Keepalived
+haproxy_enabled: true
+haproxy_version: 3.1.4
+
+# Loadbalancer identification (used in keepalived router_id)
+loadbalancer_master: "proxy-master-hostname"
+loadbalancer_backup: "proxy-backup-hostname"
+
+# HAProxy Statistics Configuration
+haproxy_stats: true
+haproxy_stats_port: 1936
+haproxy_stats_bind_addr: "0.0.0.0"
+haproxy_stats_page_user: "{{ vault_haproxy_stats_user | default('admin') }}"
+haproxy_stats_page_pass: "{{ vault_haproxy_stats_pass }}"
+haproxy_stats_page_uri: "/haproxy/stats"
+
+# Default settings for HAProxy
+haproxy_mode: http
+haproxy_options:
+  - httplog
+  - dontlognull
+  - http-server-close
+  - forwardfor except 127.0.0.0/8
+  - redispatch
+haproxy_retries: 3
+haproxy_timeout_http_request: 10s
+haproxy_timeout_connect: 10s
+haproxy_timeout_client: 1m
+haproxy_timeout_server: 1m
+haproxy_timeout_http_keep_alive: 10s
+haproxy_timeout_check: 10s
+haproxy_maxconn: 3000
+
+# Frontend configurations
+haproxy_frontends:
+  # HTTP Frontend
+  - name: http_frontend
+    address: "*"
+    port: 80
+    default_backend: http_backend
+    mode: http
+
+  # HTTPS Frontend (TCP passthrough)
+  - name: https_frontend
+    address: "*"
+    port: 443
+    default_backend: https_backend
+    mode: tcp
+
+  # Example: Custom TCP service frontend
+  - name: tcp_service_frontend
+    address: "*"
+    port: 9000
+    default_backend: tcp_service_backend
+    mode: tcp
+
+haproxy_backend_default_balance: roundrobin
+# Backend configurations
+haproxy_backends:
+  # HTTP Backend - using inventory groups
+  - name: http_backend
+    httpcheck: true
+    balance: roundrobin
+    mode: http
+    servers: "{{ groups['app_servers'] | default([]) }}"
+    port: 80
+    options:
+      - check
+
+  # HTTPS Backend - using inventory groups
+  - name: https_backend
+    balance: roundrobin
+    mode: tcp
+    servers: "{{ groups['app_servers'] | default([]) }}"
+    port: 443
+    options:
+      - check
+
+  # TCP service backend - using inventory groups
+  - name: tcp_service_backend
+    balance: roundrobin
+    mode: tcp
+    servers: "{{ groups['service_nodes'] | default([]) }}"
+    port: 9000
+    options:
+      - check
+
+  # Alternative: Manual server specification (replace inventory groups with hostnames)
+  # - name: http_backend_manual
+  #   httpcheck: true
+  #   balance: roundrobin
+  #   mode: http
+  #   servers:
+  #     - app01
+  #     - app02
+  #     - app03
+  #   port: 80
+  #   options:
+  #     - check
+
+  # Alternative: Detailed server configuration (explicit IPs and ports)
+  # - name: http_backend_detailed
+  #   httpcheck: true
+  #   balance: roundrobin
+  #   mode: http
+  #   servers:
+  #     - name: app01
+  #       address: 10.0.1.10
+  #       port: 80
+  #     - name: app02
+  #       address: 10.0.1.11
+  #       port: 80
+  #     - name: app03
+  #       address: 10.0.1.20
+  #       port: 80
+  #   options:
+  #     - check
+
+# For listen sections (combined frontend + backend for simple TCP services)
+haproxy_listen_default_balance: roundrobin
+haproxy_listens: []
+
+# ===============================================================================
+# KEEPALIVED CONFIGURATION
+# ===============================================================================
+
+keepalived_enabled: true
+keepalived_network_interface: eth0
+keepalived_version: 2.3.2
+keepalived_vrrp_instances:
+  - vrrp_instance_name: VI_1
+    virtual_ipaddress: "10.0.1.100"  # Set your virtual IP here
+    virtual_router_id: 100           # Must be unique per VRRP cluster
+
+# Directory configurations
+install_dir: /usr/local/src
+haproxy_socket_dir: /var/lib/haproxy
+haproxy_config_dir: /etc/haproxy
+keepalived_config_dir: /etc/keepalived
+# ===============================================================================
+# VARIABLE USAGE EXAMPLES
+# ===============================================================================
+#
+# Inventory Groups Usage:
+# servers: "{{ groups['app_servers'] | default([]) }}"
+# servers: "{{ groups['service_nodes'] | default([]) }}"
+#
+# Manual Hostname List:
+# servers: [app01, app02, app03]
+#
+# Detailed Configuration:
+# servers:
+#   - name: app01
+#     address: 10.0.1.10
+#     port: 80
+#   - name: app02
+#     address: 10.0.1.11
+#     port: 8080
+#
+# Vault Variables:
+# haproxy_stats_page_user: "{{ vault_haproxy_stats_user }}"
+# haproxy_stats_page_pass: "{{ vault_haproxy_stats_pass }}"
+#
+# Template Variables Used:
+# - loadbalancer_master / loadbalancer_backup (for keepalived router_id)
+# - keepalived_vrrp_instances (list of VRRP instances)
+# - keepalived_network_interface (network interface name)

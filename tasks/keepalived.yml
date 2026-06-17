@@ -1,0 +1,172 @@
+---
+- name: Check Keepalived installation status
+  when: keepalived_enabled | bool
+  block:
+    - name: Get installed Keepalived version
+      ansible.builtin.command: keepalived --version
+      register: keepalived_installed
+      changed_when: false
+      ignore_errors: true
+      check_mode: false
+
+    - name: Extract installed Keepalived version
+      ansible.builtin.set_fact:
+        installed_keepalived_version: "{{ (keepalived_installed.stderr | regex_search('Keepalived v(\\d+\\.\\d+\\.\\d+)', '\\1') | default([''], true)) | first }}"
+  rescue:
+    - name: Set empty version if not installed
+      ansible.builtin.set_fact:
+        installed_keepalived_version: ""
+
+- name: Determine if Keepalived installation is required
+  when: keepalived_enabled | bool
+  ansible.builtin.set_fact:
+    keepalived_installation_required: "{{ installed_keepalived_version | default('') != keepalived_version }}"
+
+- name: Install Keepalived if required
+  when: keepalived_installation_required and keepalived_enabled | bool
+  block:
+    - name: Download Keepalived package
+      ansible.builtin.get_url:
+        url: "https://www.keepalived.org/software/keepalived-{{ keepalived_version }}.tar.gz"
+        dest: "{{ playbook_dir }}/keepalived-{{ keepalived_version }}.tar.gz"
+        mode: "0644"
+      delegate_to: localhost
+      become: false
+      run_once: true
+
+    - name: Copy Keepalived package to the target VM
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/keepalived-{{ keepalived_version }}.tar.gz"
+        dest: "{{ install_dir }}/"
+        mode: "0644"
+
+    - name: Clean up local downloaded Keepalived package
+      ansible.builtin.file:
+        path: "{{ playbook_dir }}/keepalived-{{ keepalived_version }}.tar.gz"
+        state: absent
+      delegate_to: localhost
+      run_once: true
+      become: false
+
+    - name: Extract Keepalived package
+      ansible.builtin.unarchive:
+        src: "{{ install_dir }}/keepalived-{{ keepalived_version }}.tar.gz"
+        dest: "{{ install_dir }}"
+        remote_src: true
+        creates: "{{ install_dir }}/keepalived-{{ keepalived_version }}/configure"
+
+    - name: Configure Keepalived
+      ansible.builtin.command:
+        cmd: ./configure
+      args:
+        chdir: "{{ install_dir }}/keepalived-{{ keepalived_version }}"
+        creates: "{{ install_dir }}/keepalived-{{ keepalived_version }}/Makefile"
+      register: keepalived_configure
+      changed_when: keepalived_configure.rc == 0
+
+    - name: Compile Keepalived package
+      ansible.builtin.command:
+        cmd: make
+      args:
+        chdir: "{{ install_dir }}/keepalived-{{ keepalived_version }}"
+        creates: "{{ install_dir }}/keepalived-{{ keepalived_version }}/keepalived/keepalived"
+      register: keepalived_compile
+      changed_when: keepalived_compile.rc == 0
+
+    - name: Install Keepalived package
+      ansible.builtin.command:
+        cmd: make install
+      args:
+        chdir: "{{ install_dir }}/keepalived-{{ keepalived_version }}"
+      register: keepalived_install
+      changed_when: keepalived_install.rc == 0
+      when: keepalived_compile is changed
+
+    - name: Deploy Keepalived systemd service from source
+      ansible.builtin.copy:
+        src: "{{ install_dir }}/keepalived-{{ keepalived_version }}/keepalived/keepalived.service"
+        dest: /etc/systemd/system/keepalived.service
+        mode: "0644"
+        remote_src: true
+      notify: Reload systemd
+
+    - name: Copy Keepalived binary to /usr/local/sbin
+      ansible.builtin.copy:
+        src: "{{ install_dir }}/keepalived-{{ keepalived_version }}/keepalived/keepalived"
+        dest: /usr/local/sbin/keepalived
+        mode: "0755"
+        remote_src: true
+
+- name: Copy Keepalived configuration
+  when: keepalived_enabled | bool
+  ansible.builtin.template:
+    src: keepalived.conf.j2
+    dest: "{{ keepalived_config_dir }}/keepalived.conf"
+    mode: "0644"
+    backup: true
+  notify:
+    - Cleanup keepalived config backups
+
+- name: Validate Keepalived configuration
+  when: keepalived_enabled | bool
+  ansible.builtin.command:
+    cmd: keepalived -t
+  changed_when: false
+  notify:
+    - Restart keepalived
+
+- name: Configure Keepalived custom log facility
+  when: keepalived_enabled | bool
+  ansible.builtin.command:
+    cmd: keepalived --log-facility=local1
+  changed_when: false
+  notify:
+    - Restart keepalived
+
+- name: Configure the rsyslog configuration file to accept UDP syslog reception
+  when: keepalived_enabled | bool
+  ansible.builtin.copy:
+    dest: "/etc/rsyslog.d/keepalived.conf"
+    mode: "0644"
+    content: |
+      # Creating separate log files based on the severity
+      local1.*  /var/log/keepalived.log
+  notify: Restart rsyslog
+
+- name: Enable/Start Keepalived service
+  when: keepalived_enabled | bool
+  ansible.builtin.systemd_service:
+    name: keepalived
+    state: started
+    enabled: true
+    daemon_reload: true
+
+- name: Wait for Keepalived to initialize
+  when: keepalived_enabled | bool
+  ansible.builtin.pause:
+    seconds: 5
+
+- name: Check Keepalived process is running
+  when: keepalived_enabled | bool
+  ansible.builtin.command: pgrep -x keepalived
+  register: keepalived_process
+  changed_when: false
+  failed_when: keepalived_process.rc != 0
+
+- name: Verify Keepalived service status
+  when: keepalived_enabled | bool
+  ansible.builtin.systemd_service:
+    name: keepalived
+  register: keepalived_service_status
+  failed_when: keepalived_service_status.status.ActiveState != 'active'
+
+- name: Check VIP assignment on master node
+  when:
+    - keepalived_enabled | bool
+    - inventory_hostname == loadbalancer_master
+  ansible.builtin.command: ip addr show
+  register: vip_check
+  changed_when: false
+  failed_when: >
+    keepalived_vrrp_instances | map(attribute='virtual_ipaddress') |
+    select('in', vip_check.stdout) | list | length == 0

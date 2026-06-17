@@ -1,0 +1,49 @@
+---
+# ============================================================================
+# Ansible Vault Example - DO NOT COMMIT ACTUAL SECRETS
+# ============================================================================
+# This file shows the structure for storing sensitive variables.
+#
+# To use:
+# 1. Copy this file: cp vault.example.yml vault.yml
+# 2. Replace the example values with your actual secrets
+# 3. Encrypt the file: ansible-vault encrypt vault.yml
+# 4. Never commit vault.yml to version control
+# 5. Add vault.yml to .gitignore
+# ============================================================================
+
+# HAProxy Stats Page Password
+vault_haproxy_stats_password: "your-secure-stats-password-here"
+
+# SSL Certificate Passwords (if using encrypted certificates)
+vault_ssl_cert_password: "your-ssl-cert-password-here"
+
+# Cloud API Token (for Floating IP integration)
+# Examples:
+#   - Hetzner: https://console.hetzner.cloud/ → Security → API Tokens
+#   - DigitalOcean: https://cloud.digitalocean.com/account/api/tokens
+# Required permissions: Read & Write
+vault_cloud_api_token: "your-cloud-api-token-here"
+
+# ============================================================================
+# Usage in Playbook
+# ============================================================================
+# - hosts: proxy_hosts
+#   vars_files:
+#     - vault.yml
+#   roles:
+#     - ansible-role-haproxy-keepalived
+# ============================================================================
+
+# ============================================================================
+# Encryption/Decryption Commands
+# ============================================================================
+# Encrypt:   ansible-vault encrypt vault.yml
+# Decrypt:   ansible-vault decrypt vault.yml
+# Edit:      ansible-vault edit vault.yml
+# View:      ansible-vault view vault.yml
+# Rekey:     ansible-vault rekey vault.yml
+#
+# Run playbook with vault:
+#   ansible-playbook -i inventory playbook.yml --ask-vault-pass
+# ============================================================================

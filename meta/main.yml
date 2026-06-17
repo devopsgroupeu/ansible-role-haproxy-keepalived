@@ -1,0 +1,42 @@
+---
+galaxy_info:
+  author: DevOpsGroup
+  company: DevOpsGroup s.r.o
+  description: |
+    Production-ready Ansible role for installing and configuring HAProxy with Keepalived
+    in high-availability mode. Compiles from source for maximum performance and supports
+    both internet-connected and air-gapped environments.
+
+  license: Apache-2.0
+  min_ansible_version: "2.12"
+
+  role_name: haproxy_keepalived
+  namespace: devopsgroup
+
+  galaxy_tags:
+    - loadbalancer
+    - haproxy
+    - keepalived
+    - highavailability
+    - ha
+    - vrrp
+    - failover
+    - proxy
+    - reverseproxy
+    - networking
+    - clustering
+    - vip
+
+  platforms:
+    - name: Ubuntu
+      versions:
+        - all
+    - name: Debian
+      versions:
+        - all
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+
+dependencies: []

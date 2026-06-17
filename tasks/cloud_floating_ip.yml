@@ -1,0 +1,112 @@
+---
+# ============================================================================
+# Cloud Floating IP API Integration
+# ============================================================================
+# Optional tasks for cloud provider Floating IP automatic failover
+# Only runs when cloud_floating_ip_enabled: true
+# Supports: Hetzner Cloud, DigitalOcean, AWS, and custom APIs
+
+- name: Validate cloud Floating IP configuration
+  ansible.builtin.assert:
+    that:
+      - cloud_api_token is defined
+      - cloud_api_token | length > 0
+      - floating_ip_address is defined
+      - floating_ip_address | length > 0
+      - cloud_api_endpoint is defined
+      - cloud_api_endpoint | length > 0
+    fail_msg: |
+      Cloud Floating IP is enabled but required variables are missing.
+      Required: cloud_api_token, floating_ip_address, cloud_api_endpoint
+      Store API token in Ansible Vault for security!
+    success_msg: "Cloud Floating IP configuration validated"
+
+- name: Install curl for API calls
+  ansible.builtin.package:
+    name: curl
+    state: present
+  become: true
+
+- name: Deploy cloud Floating IP notify script
+  ansible.builtin.template:
+    src: cloud-floating-ip-notify.sh.j2
+    dest: /usr/local/bin/cloud-floating-ip-notify.sh
+    owner: root
+    group: root
+    mode: '0750'
+  become: true
+  notify: Restart keepalived
+
+- name: Create log file for cloud Floating IP script
+  ansible.builtin.file:
+    path: /var/log/cloud-floating-ip.log
+    state: touch
+    owner: root
+    group: root
+    mode: '0640'
+    modification_time: preserve
+    access_time: preserve
+  become: true
+
+- name: Test cloud API connectivity
+  ansible.builtin.uri:
+    url: "{{ cloud_api_endpoint }}/servers?name={{ cloud_server_name }}"
+    method: GET
+    headers:
+      Authorization: "Bearer {{ cloud_api_token }}"
+    return_content: true
+    status_code: 200
+  register: cloud_api_test
+  changed_when: false
+  failed_when: false
+  no_log: true  # Don't log API token
+
+- name: Display cloud API test result
+  ansible.builtin.debug:
+    msg: |
+      Cloud API Test: {{ 'SUCCESS' if cloud_api_test.status == 200 else 'FAILED' }}
+      {% if cloud_api_test.status == 200 %}
+      Server found: {{ cloud_server_name }}
+      Floating IP will be automatically assigned on MASTER transition
+      {% else %}
+      Error: {{ cloud_api_test.msg | default('Unknown error') }}
+      {% endif %}
+
+- name: Deploy systemd service for Floating IP persistence on reboot
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/cloud-floating-ip.service
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=Assign cloud Floating IP on boot if this node is MASTER
+      After=network-online.target keepalived.service
+      Wants=network-online.target
+      PartOf=keepalived.service
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStart=/bin/bash -c '\
+        sleep 5; \
+        STATE=$(journalctl -u keepalived -n 50 --no-pager | grep -oE "Entering (MASTER|BACKUP|FAULT) STATE" | tail -1 | awk "{print \$2}"); \
+        if [ "$STATE" = "MASTER" ]; then \
+          /usr/local/bin/cloud-floating-ip-notify.sh MASTER; \
+        fi'
+
+      [Install]
+      WantedBy=multi-user.target
+  become: true
+  notify: Reload systemd and enable floating IP service
+
+- name: Warn if API test failed
+  ansible.builtin.fail:
+    msg: |
+      Cloud API connectivity test failed!
+      Please verify:
+        - API token is valid and has appropriate permissions
+        - Server name '{{ cloud_server_name }}' exists in your cloud provider
+        - Network connectivity to {{ cloud_api_endpoint }}
+        - API endpoint is correct for your provider
+  when: cloud_api_test.status != 200

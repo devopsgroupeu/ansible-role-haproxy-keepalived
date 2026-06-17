@@ -1,0 +1,401 @@
+---
+# ============================================================================
+# HAProxy + Keepalived Ansible Role - Default Variables
+# ============================================================================
+# This file contains all configurable variables for the HAProxy and Keepalived
+# role. Override these in your playbook's group_vars or host_vars as needed.
+#
+# Documentation: See README.md and docs/CONFIGURATION.md for detailed examples
+# ============================================================================
+
+# ============================================================================
+# Load Balancer Node Identification
+# ============================================================================
+# These variables identify which nodes are master and backup load balancers.
+# Set these to the inventory_hostname of your proxy nodes.
+#
+# REQUIRED: Both must be set for HA configuration
+# Example:
+#   loadbalancer_master: "proxy-master-01"
+#   loadbalancer_backup: "proxy-backup-01"
+#
+# The master node will receive priority 100, backup will receive priority 90
+
+loadbalancer_master: ""
+loadbalancer_backup: ""
+
+# ============================================================================
+# HAProxy Configuration
+# ============================================================================
+
+# Enable/disable HAProxy installation and configuration
+haproxy_enabled: true
+
+# HAProxy version to install (must be available from haproxy.org)
+# Minimum supported version: 2.0
+# Check available versions: https://www.haproxy.org/download/
+haproxy_version: 3.1.4
+
+# Complete HAProxy configuration as a string (alternative to individual parameters)
+# If set, this will be used instead of the dynamically generated configuration
+# Use this for advanced custom configurations or migration from existing setup
+# Example: haproxy_config: "{{ lookup('file', 'files/custom-haproxy.cfg') }}"
+haproxy_config: ""
+
+# ----------------------------------------------------------------------------
+# HAProxy Global Settings
+# ----------------------------------------------------------------------------
+
+# User and group for running HAProxy process
+haproxy_user: haproxy
+haproxy_group: haproxy
+
+# Syslog facility for HAProxy logging (local0-local7)
+# Logs will be sent to rsyslog with this facility
+haproxy_log_facility: local2
+
+# Default mode for frontends/backends (http or tcp)
+haproxy_mode: http
+
+# HAProxy global options for the defaults section
+# Common options:
+#   - httplog: Enable HTTP request logging
+#   - dontlognull: Don't log connections with no data transferred
+#   - http-server-close: Enable HTTP close mode (one request per connection)
+#   - forwardfor except 127.0.0.0/8: Add X-Forwarded-For header (except from localhost)
+#   - redispatch: Allow session redispatch in case of connection failure
+haproxy_options:
+  - httplog
+  - dontlognull
+  - http-server-close
+  - forwardfor except 127.0.0.0/8
+  - redispatch
+
+# Connection and retry settings
+haproxy_retries: 3          # Number of retries on connection failure
+haproxy_maxconn: 3000       # Maximum concurrent connections
+
+# Timeout settings (adjust based on your application requirements)
+haproxy_timeout_http_request: 10s      # Max time to receive complete HTTP request
+haproxy_timeout_connect: 10s           # Max time to establish connection to backend
+haproxy_timeout_client: 1m             # Max inactivity time on client side
+haproxy_timeout_server: 1m             # Max inactivity time on server side
+haproxy_timeout_http_keep_alive: 10s   # Max time to wait for new HTTP request
+haproxy_timeout_check: 10s             # Max time for health check completion
+
+# ----------------------------------------------------------------------------
+# HAProxy Statistics Page
+# ----------------------------------------------------------------------------
+
+# Enable HAProxy statistics page
+# Provides web UI at http://<host>:<port><uri> with metrics and server status
+# Also exposes Prometheus metrics at /metrics endpoint
+haproxy_stats: true
+haproxy_stats_port: 1936
+haproxy_stats_bind_addr: "0.0.0.0"  # Bind to all interfaces; use "127.0.0.1" for localhost only
+haproxy_stats_page_uri: "/haproxy/stats"
+
+# ⚠️  SECURITY WARNING: Change default credentials before production deployment!
+# Default credentials are INTENTIONALLY WEAK and will trigger validation errors
+# Store credentials securely using Ansible Vault:
+#   haproxy_stats_page_user: "{{ vault_haproxy_stats_user }}"
+#   haproxy_stats_page_pass: "{{ vault_haproxy_stats_pass }}"
+haproxy_stats_page_user: "admin"
+haproxy_stats_page_pass: "admin"  # ⚠️  MUST BE CHANGED - validation will fail with default "admin"
+
+# ----------------------------------------------------------------------------
+# HAProxy Frontends
+# ----------------------------------------------------------------------------
+# Define frontend listeners that receive incoming connections
+#
+# Available options:
+#   - name: Unique name for this frontend (required)
+#   - address: Bind address, "*" for all interfaces (required)
+#   - port: Port number to listen on (required)
+#   - default_backend: Name of backend to forward traffic to (required)
+#   - mode: Protocol mode - "http" or "tcp" (default: http)
+#   - ssl: Enable SSL/TLS termination (default: false)
+#   - crts: List of certificate paths for SSL (requires ssl: true)
+#   - monitor_uri: Health check endpoint (e.g., "/health")
+#   - monitor_fail: Condition to fail health check
+#   - http_request: Custom HTTP request rules
+#   - no_log: Disable logging for this frontend (default: false)
+#   - option: Override default logging option (httplog or tcplog)
+#
+# Examples:
+# haproxy_frontends:
+#   # Basic HTTP frontend
+#   - name: http_frontend
+#     address: "*"
+#     port: 80
+#     default_backend: web_backend
+#     mode: http
+#     monitor_uri: /health
+#
+#   # TCP frontend for a custom service
+#   - name: tcp_service_frontend
+#     address: "*"
+#     port: 9000
+#     default_backend: tcp_service_backend
+#     mode: tcp
+#
+#   # HTTPS frontend with SSL termination
+#   - name: https_frontend
+#     address: "*"
+#     port: 443
+#     default_backend: web_backend
+#     mode: http
+#     ssl: true
+#     crts:
+#       - /etc/haproxy/certs/example.com.pem
+
+haproxy_frontends: []
+
+# ----------------------------------------------------------------------------
+# HAProxy Backends
+# ----------------------------------------------------------------------------
+# Define backend server pools that receive traffic from frontends
+#
+# Available options:
+#   - name: Unique name for this backend (required)
+#   - servers: List of backend servers (required) - see three methods below
+#   - port: Default port for all servers (required if not specified per-server)
+#   - mode: Protocol mode - "http" or "tcp" (default: http)
+#   - balance: Load balancing algorithm (default: roundrobin)
+#     Options: roundrobin, leastconn, source, uri, etc.
+#   - httpcheck: Enable HTTP health checks (default: false)
+#   - httpcheck_method: HTTP method for health checks (GET, HEAD, OPTIONS)
+#   - http_check: Advanced HTTP health check configuration
+#     - send: {method: GET, uri: /health}
+#     - expect: status 200
+#   - http_send_name_header: Send server name in this HTTP header
+#   - options: List of HAProxy server options (check, inter, rise, fall, etc.)
+#
+# ── Three Server Specification Methods ──────────────────────────────────────
+#
+# Method 1: Ansible Inventory Groups (recommended for dynamic inventories)
+#   servers: "{{ groups['backend_servers'] | default([]) }}"
+#   - Automatically resolves hostnames to IP addresses
+#   - Uses ansible_ssh_host or ansible_default_ipv4.address
+#   - Requires gather_facts: true
+#
+# Method 2: Simple Hostname List (good for static known hosts)
+#   servers: ["web01", "web02", "web03"]
+#   - Hostnames must be resolvable in Ansible inventory
+#   - IP addresses will be auto-detected from facts
+#
+# Method 3: Detailed Configuration (most control, explicit IPs)
+#   servers:
+#     - name: web01
+#       address: 192.168.1.10
+#       port: 8080  # Override default port per server
+#     - name: web02
+#       address: 192.168.1.11
+#       port: 8080
+#
+# ────────────────────────────────────────────────────────────────────────────
+
+haproxy_backend_default_balance: roundrobin
+
+# Examples:
+# haproxy_backends:
+#   # TCP backend using inventory group
+#   - name: tcp_service_backend
+#     balance: roundrobin
+#     mode: tcp
+#     servers: "{{ groups['service_nodes'] | default([]) }}"
+#     port: 9000
+#     options:
+#       - check
+#       - inter 2s
+#       - rise 2
+#       - fall 3
+#
+#   # HTTP backend with health checks (hostname list)
+#   - name: web_backend
+#     httpcheck: true
+#     balance: leastconn
+#     mode: http
+#     servers: ["web01", "web02", "web03"]
+#     port: 80
+#     options:
+#       - check
+#
+#   # HTTP backend with advanced health check (detailed servers)
+#   - name: api_backend
+#     mode: http
+#     balance: roundrobin
+#     http_check:
+#       send:
+#         method: GET
+#         uri: /api/health
+#       expect: status 200
+#     servers:
+#       - name: api01
+#         address: 10.0.1.10
+#         port: 8080
+#       - name: api02
+#         address: 10.0.1.11
+#         port: 8080
+#     options:
+#       - check
+#       - inter 5s
+
+haproxy_backends: []
+
+# ----------------------------------------------------------------------------
+# HAProxy Listen Sections
+# ----------------------------------------------------------------------------
+# Combined frontend+backend sections (less common, use frontends/backends instead)
+
+haproxy_listen_default_balance: roundrobin
+haproxy_listens: []
+
+# ============================================================================
+# Keepalived Configuration
+# ============================================================================
+
+# Enable/disable Keepalived installation and configuration
+keepalived_enabled: true
+
+# Keepalived version to install (minimum supported: 2.0)
+# Check available versions: https://www.keepalived.org/download.html
+keepalived_version: 2.3.2
+
+# Network interface for VRRP advertisements
+# IMPORTANT: Must match the interface name on your system
+# Common values: eth0, ens3, ens160, ens192
+# Run 'ip addr' on target hosts to find interface names
+keepalived_network_interface: eth0
+
+# Use unicast instead of multicast for VRRP communication.
+# Set to true for cloud environments (AWS, Hetzner, DigitalOcean) where multicast is blocked.
+# Set to false for bare-metal / on-prem networks where multicast is available.
+# NOTE: When true, hosts must be in the 'proxy_hosts' inventory group for peer discovery.
+keepalived_unicast: true
+
+# ----------------------------------------------------------------------------
+# VRRP Instances
+# ----------------------------------------------------------------------------
+# Configure Virtual Router Redundancy Protocol instances
+# Each instance manages one Virtual IP (VIP) that will float between nodes
+#
+# REQUIREMENT: Hosts must be in the 'proxy_hosts' inventory group for
+# automatic peer discovery (used in keepalived.conf.j2 template)
+#
+# Fields:
+#   - vrrp_instance_name: Unique identifier for this VRRP instance (required)
+#   - virtual_ipaddress: The floating VIP in CIDR or plain format (required)
+#     Examples: "192.168.1.100" or "192.168.1.100/24"
+#   - virtual_router_id: Unique ID per VRRP cluster, 1-255 (required)
+#     Must be unique across all VRRP instances on the same network
+#   - priority: Priority value for election (optional, default: auto-assigned)
+#     Higher priority becomes master. Auto-assignment: master=100, backup=90
+#   - state: Initial state MASTER or BACKUP (optional, default: auto-assigned)
+#     Usually auto-assigned based on loadbalancer_master/loadbalancer_backup
+#
+# VRRP Instance Configuration:
+#   - Uses unicast communication (cloud-friendly, no multicast)
+#   - Tracks HAProxy service health automatically
+#   - Automatic failover when HAProxy stops or fails health checks
+#   - Peers discovered automatically from proxy_hosts inventory group
+#
+# Example:
+# keepalived_vrrp_instances:
+#   # Single VIP for general use
+#   - vrrp_instance_name: VI_MAIN
+#     virtual_ipaddress: "192.168.1.100"
+#     virtual_router_id: 100
+#
+#   # Additional VIP for a second service
+#   - vrrp_instance_name: VI_2
+#     virtual_ipaddress: "192.168.1.101"
+#     virtual_router_id: 101
+#
+#   # Custom priority override
+#   - vrrp_instance_name: VI_CUSTOM
+#     virtual_ipaddress: "192.168.1.102"
+#     virtual_router_id: 102
+#     priority: 110
+#     state: MASTER
+
+keepalived_vrrp_instances:
+  - vrrp_instance_name: VI_1
+    virtual_ipaddress: ""  # ⚠️  MUST BE SET - validation will fail if empty
+    virtual_router_id: 100
+
+# ============================================================================
+# Directory Configuration
+# ============================================================================
+# Installation and configuration directories
+# Generally safe to use defaults unless you have specific filesystem requirements
+
+# Source code compilation directory
+install_dir: /usr/local/src
+
+# HAProxy runtime directory for Unix sockets and chroot
+haproxy_socket_dir: /var/lib/haproxy
+
+# HAProxy configuration file directory
+# Config file will be: {{ haproxy_config_dir }}/haproxy.cfg
+# SSL certificates directory: {{ haproxy_config_dir }}/certs/
+haproxy_config_dir: /etc/haproxy
+
+# Keepalived configuration file directory
+# Config file will be: {{ keepalived_config_dir }}/keepalived.conf
+keepalived_config_dir: /etc/keepalived
+
+# ============================================================================
+# Cloud Floating IP API Integration (Optional)
+# ============================================================================
+# Optional integration for cloud provider Floating IP automatic failover.
+# When enabled, the role will configure Keepalived to automatically reassign
+# the Floating IP via cloud API when VRRP state changes.
+#
+# ⚠️  SECURITY WARNING: Store cloud_api_token in Ansible Vault!
+#
+# Supported providers:
+#   - Hetzner Cloud
+#   - DigitalOcean
+#   - AWS Elastic IP
+#   - Or any provider with REST API for IP assignment
+#
+# Requirements:
+#   - Cloud account with Floating/Elastic IP
+#   - API token with appropriate permissions
+#   - curl installed on servers
+#
+# How it works:
+#   1. VRRP manages internal VIP failover (always active)
+#   2. On MASTER transition, calls cloud API to assign Floating IP
+#   3. External traffic reaches the active server via Floating IP
+#   4. Internal traffic uses VRRP VIP
+#
+# If disabled, role works universally with standard VRRP only.
+
+# Enable cloud Floating IP API integration
+cloud_floating_ip_enabled: false
+
+# Cloud provider API endpoint
+# Hetzner: https://api.hetzner.cloud/v1
+# DigitalOcean: https://api.digitalocean.com/v2
+# Custom: your API endpoint
+cloud_api_endpoint: "https://api.hetzner.cloud/v1"
+
+# Cloud API Token (⚠️  Store in vault!)
+# Example: cloud_api_token: "{{ vault_cloud_api_token }}"
+cloud_api_token: ""
+
+# Floating IP address to manage
+# Example: floating_ip_address: "95.217.27.127"
+floating_ip_address: ""
+
+# Server name/identifier for API calls
+# Defaults to inventory_hostname
+cloud_server_name: "{{ inventory_hostname }}"
+
+# Public network interface to configure the Floating IP on
+# This is the interface the Floating IP is added to so the kernel accepts traffic for it
+# Common values: eth0, ens3, ens160
+# NOTE: This is different from keepalived_network_interface (which is the private network)
+cloud_floating_ip_interface: "eth0"

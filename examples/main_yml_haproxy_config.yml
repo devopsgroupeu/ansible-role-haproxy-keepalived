@@ -1,0 +1,165 @@
+# ===============================================================================
+# HAPROXY + KEEPALIVED CONFIGURATION EXAMPLE
+# ===============================================================================
+# Generic example for web applications, APIs, databases, and TCP services.
+# Copy and adapt this to your group_vars/proxy.yml file.
+# ===============================================================================
+
+# Complete HAProxy configuration as a string (alternative to individual parameters)
+# If set, this will be used instead of individual parameters
+haproxy_config: ""
+
+# HAProxy and Keepalived enable flags
+haproxy_enabled: true
+haproxy_version: 3.1.4
+
+# Load balancer node identification
+loadbalancer_master: "proxy-master-hostname"
+loadbalancer_backup: "proxy-backup-hostname"
+
+# Stats page
+haproxy_stats: true
+haproxy_stats_port: 1936
+haproxy_stats_bind_addr: "0.0.0.0"
+haproxy_stats_page_user: "{{ vault_haproxy_stats_user | default('admin') }}"
+haproxy_stats_page_pass: "{{ vault_haproxy_stats_pass }}"
+haproxy_stats_page_uri: "/haproxy/stats"
+
+# Global defaults
+haproxy_mode: http
+haproxy_options:
+  - httplog
+  - dontlognull
+  - http-server-close
+  - forwardfor except 127.0.0.0/8
+  - redispatch
+haproxy_retries: 3
+haproxy_timeout_http_request: 10s
+haproxy_timeout_connect: 10s
+haproxy_timeout_client: 1m
+haproxy_timeout_server: 1m
+haproxy_timeout_http_keep_alive: 10s
+haproxy_timeout_check: 10s
+haproxy_maxconn: 3000
+
+# HAProxy Frontend configurations
+haproxy_frontends:
+  # HTTP Frontend
+  - name: http_frontend
+    address: "*"
+    port: 80
+    default_backend: http_backend
+    mode: http
+
+  # HTTPS Frontend (TCP passthrough)
+  - name: https_frontend
+    address: "*"
+    port: 443
+    default_backend: https_backend
+    mode: tcp
+
+  # Example: Custom TCP service frontend
+  - name: tcp_service_frontend
+    address: "*"
+    port: 9000
+    default_backend: tcp_service_backend
+    mode: tcp
+
+haproxy_backend_default_balance: roundrobin
+# HAProxy Backend configurations
+haproxy_backends:
+  # HTTP backend - using inventory group (method 1)
+  - name: http_backend
+    httpcheck: true
+    balance: roundrobin
+    mode: http
+    servers: "{{ groups['app_servers'] | default([]) }}"
+    port: 80
+    options:
+      - check
+
+  # HTTPS backend - using inventory group
+  - name: https_backend
+    balance: roundrobin
+    mode: tcp
+    servers: "{{ groups['app_servers'] | default([]) }}"
+    port: 443
+    options:
+      - check
+
+  # TCP service backend - using inventory group
+  - name: tcp_service_backend
+    balance: roundrobin
+    mode: tcp
+    servers: "{{ groups['service_nodes'] | default([]) }}"
+    port: 9000
+    options:
+      - check
+
+  # Alternative: Manual hostname list (method 2)
+  # - name: http_backend_manual
+  #   httpcheck: true
+  #   balance: roundrobin
+  #   mode: http
+  #   servers:
+  #     - app01
+  #     - app02
+  #     - app03
+  #   port: 80
+  #   options:
+  #     - check
+
+  # Alternative: Detailed server configuration with IPs (method 3)
+  # - name: http_backend_detailed
+  #   httpcheck: true
+  #   balance: roundrobin
+  #   mode: http
+  #   servers:
+  #     - name: app01
+  #       address: 10.0.1.10
+  #       port: 80
+  #     - name: app02
+  #       address: 10.0.1.11
+  #       port: 80
+  #   options:
+  #     - check
+
+# Listen sections (combined frontend + backend, useful for simple TCP services)
+haproxy_listen_default_balance: roundrobin
+haproxy_listens: []
+
+# Keepalived configuration
+keepalived_enabled: true
+keepalived_network_interface: eth0  # Change to your network interface
+keepalived_version: 2.3.2
+keepalived_vrrp_instances:
+  - vrrp_instance_name: VI_1
+    virtual_ipaddress: "10.0.1.100"  # Your Virtual IP address
+    virtual_router_id: 100            # Must be unique per VRRP cluster
+
+# Directory configurations (defaults — override if needed)
+install_dir: /usr/local/src
+haproxy_socket_dir: /var/lib/haproxy
+haproxy_config_dir: /etc/haproxy
+keepalived_config_dir: /etc/keepalived
+
+# ===============================================================================
+# USAGE INSTRUCTIONS:
+# ===============================================================================
+# 1. Copy this configuration to your group_vars/proxy.yml file
+# 2. Update virtual_ipaddress to your desired VIP
+# 3. Update keepalived_network_interface to match your server's network interface
+# 4. Update loadbalancer_master and loadbalancer_backup hostnames
+# 5. Choose your server specification method:
+#    a) Inventory groups: servers: "{{ groups['app_servers'] }}"
+#    b) Manual hostnames: servers: [app01, app02, app03]
+#    c) Detailed config with IPs and ports (see commented example above)
+# 6. Store stats credentials in Ansible Vault
+# 7. Run your playbook to apply the configuration
+#
+# The configuration will create:
+# - HTTP load balancing on port 80
+# - HTTPS/TCP load balancing on port 443
+# - Custom TCP service load balancing on port 9000 (adapt as needed)
+# - HAProxy statistics page on port 1936
+# - Virtual IP failover with Keepalived

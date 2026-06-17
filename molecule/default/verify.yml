@@ -1,0 +1,216 @@
+---
+# ============================================================================
+# Molecule Verification Playbook
+# ============================================================================
+# This playbook verifies that the role installed and configured everything
+# correctly.
+# ============================================================================
+
+- name: Verify HAProxy and Keepalived installation
+  hosts: proxy_hosts
+  become: true
+  gather_facts: true
+  tasks:
+    # ========================================================================
+    # HAProxy Verification
+    # ========================================================================
+
+    - name: Check if HAProxy is installed
+      ansible.builtin.command: haproxy -v
+      register: haproxy_version_check
+      changed_when: false
+      failed_when: haproxy_version_check.rc != 0
+
+    - name: Verify HAProxy version
+      ansible.builtin.assert:
+        that:
+          - "'3.1.4' in haproxy_version_check.stdout"
+        fail_msg: "HAProxy version mismatch"
+        success_msg: "HAProxy version is correct"
+
+    - name: Check if HAProxy service is running
+      ansible.builtin.service_facts:
+
+    - name: Verify HAProxy service status
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.services['haproxy.service'] is defined
+          - ansible_facts.services['haproxy.service'].state == 'running'
+          - ansible_facts.services['haproxy.service'].status == 'enabled'
+        fail_msg: "HAProxy service is not running or enabled"
+        success_msg: "HAProxy service is running and enabled"
+
+    - name: Check HAProxy configuration file exists
+      ansible.builtin.stat:
+        path: /etc/haproxy/haproxy.cfg
+      register: haproxy_config
+
+    - name: Verify HAProxy configuration exists
+      ansible.builtin.assert:
+        that:
+          - haproxy_config.stat.exists
+        fail_msg: "HAProxy configuration file not found"
+        success_msg: "HAProxy configuration file exists"
+
+    - name: Validate HAProxy configuration syntax
+      ansible.builtin.command: haproxy -c -f /etc/haproxy/haproxy.cfg
+      changed_when: false
+      register: haproxy_syntax_check
+
+    - name: Verify HAProxy configuration is valid
+      ansible.builtin.assert:
+        that:
+          - haproxy_syntax_check.rc == 0
+        fail_msg: "HAProxy configuration syntax is invalid"
+        success_msg: "HAProxy configuration syntax is valid"
+
+    - name: Check HAProxy stats page responds
+      ansible.builtin.uri:
+        url: http://localhost:1936/haproxy/stats
+        user: admin
+        password: test_password_123
+        force_basic_auth: true
+        status_code: 200
+      register: stats_check
+      retries: 3
+      delay: 2
+
+    # ========================================================================
+    # Keepalived Verification
+    # ========================================================================
+
+    - name: Check if Keepalived is installed
+      ansible.builtin.command: keepalived --version
+      register: keepalived_version_check
+      changed_when: false
+      failed_when: keepalived_version_check.rc != 0
+
+    - name: Verify Keepalived version
+      ansible.builtin.assert:
+        that:
+          - "'2.3.2' in keepalived_version_check.stderr"
+        fail_msg: "Keepalived version mismatch"
+        success_msg: "Keepalived version is correct"
+
+    - name: Check if Keepalived service is running
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.services['keepalived.service'] is defined
+          - ansible_facts.services['keepalived.service'].state == 'running'
+          - ansible_facts.services['keepalived.service'].status == 'enabled'
+        fail_msg: "Keepalived service is not running or enabled"
+        success_msg: "Keepalived service is running and enabled"
+
+    - name: Check Keepalived configuration file exists
+      ansible.builtin.stat:
+        path: /etc/keepalived/keepalived.conf
+      register: keepalived_config
+
+    - name: Verify Keepalived configuration exists
+      ansible.builtin.assert:
+        that:
+          - keepalived_config.stat.exists
+        fail_msg: "Keepalived configuration file not found"
+        success_msg: "Keepalived configuration file exists"
+
+    - name: Validate Keepalived configuration
+      ansible.builtin.command: keepalived -t
+      changed_when: false
+      register: keepalived_syntax_check
+      failed_when: keepalived_syntax_check.rc != 0
+
+    # ========================================================================
+    # Directory and File Permissions
+    # ========================================================================
+
+    - name: Check HAProxy socket directory exists
+      ansible.builtin.stat:
+        path: /var/lib/haproxy
+      register: socket_dir
+
+    - name: Verify socket directory
+      ansible.builtin.assert:
+        that:
+          - socket_dir.stat.exists
+          - socket_dir.stat.isdir
+        fail_msg: "HAProxy socket directory not found"
+        success_msg: "HAProxy socket directory exists"
+
+    - name: Check certificate directory exists
+      ansible.builtin.stat:
+        path: /etc/haproxy/certs
+      register: cert_dir
+
+    - name: Verify certificate directory
+      ansible.builtin.assert:
+        that:
+          - cert_dir.stat.exists
+          - cert_dir.stat.isdir
+        fail_msg: "Certificate directory not found"
+        success_msg: "Certificate directory exists"
+
+    # ========================================================================
+    # Log Files
+    # ========================================================================
+
+    - name: Check rsyslog configuration for HAProxy
+      ansible.builtin.stat:
+        path: /etc/rsyslog.d/haproxy.conf
+      register: haproxy_rsyslog
+
+    - name: Verify rsyslog HAProxy configuration
+      ansible.builtin.assert:
+        that:
+          - haproxy_rsyslog.stat.exists
+        fail_msg: "HAProxy rsyslog configuration not found"
+        success_msg: "HAProxy rsyslog configuration exists"
+
+    - name: Check rsyslog configuration for Keepalived
+      ansible.builtin.stat:
+        path: /etc/rsyslog.d/keepalived.conf
+      register: keepalived_rsyslog
+
+    - name: Verify rsyslog Keepalived configuration
+      ansible.builtin.assert:
+        that:
+          - keepalived_rsyslog.stat.exists
+        fail_msg: "Keepalived rsyslog configuration not found"
+        success_msg: "Keepalived rsyslog configuration exists"
+
+- name: Verify VIP assignment on master
+  hosts: proxy-master
+  become: true
+  tasks:
+    - name: Wait for VIP to be assigned
+      ansible.builtin.wait_for:
+        timeout: 10
+      delegate_to: localhost
+
+    - name: Check if VIP is assigned
+      ansible.builtin.command: ip addr show
+      register: ip_check
+      changed_when: false
+
+    - name: Verify VIP is present on master
+      ansible.builtin.assert:
+        that:
+          - "'172.18.0.100' in ip_check.stdout"
+        fail_msg: "Virtual IP not found on master node"
+        success_msg: "Virtual IP is assigned to master node"
+
+- name: Display test summary
+  hosts: proxy_hosts
+  gather_facts: false
+  tasks:
+    - name: Test summary
+      ansible.builtin.debug:
+        msg:
+          - "=========================================="
+          - "✅ All verification tests passed!"
+          - "=========================================="
+          - "HAProxy: Installed and running"
+          - "Keepalived: Installed and running"
+          - "VIP: Assigned to master node"
+          - "Configuration: Valid and active"
+          - "=========================================="
+      run_once: true
