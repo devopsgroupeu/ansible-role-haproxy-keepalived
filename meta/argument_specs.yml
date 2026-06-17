@@ -281,6 +281,21 @@ argument_specs:
         required: false
         default: /var/lib/haproxy
         description: HAProxy runtime/chroot directory.
+      haproxy_admin_socket_dir:
+        type: path
+        required: false
+        default: /run/haproxy
+        description: Directory for the admin runtime socket; must be outside the chroot.
+      haproxy_admin_socket:
+        type: path
+        required: false
+        default: /run/haproxy/admin.sock
+        description: Admin runtime socket path (level admin, expose-fd listeners).
+      haproxy_hard_stop_after:
+        type: str
+        required: false
+        default: "30s"
+        description: Time after a reload before old workers are hard-stopped.
       keepalived_enabled:
         type: bool
         required: false

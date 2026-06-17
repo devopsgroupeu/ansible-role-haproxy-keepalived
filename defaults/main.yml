@@ -415,6 +415,14 @@ haproxy_install_dir: /usr/local/src
 # HAProxy runtime directory for Unix sockets and chroot
 haproxy_socket_dir: /var/lib/haproxy
 
+# Admin runtime socket for hitless reloads. MUST live OUTSIDE the chroot
+# ({{ haproxy_socket_dir }}) so the master process can reach it during reload.
+haproxy_admin_socket_dir: /run/haproxy
+haproxy_admin_socket: "{{ haproxy_admin_socket_dir }}/admin.sock"
+
+# Force a hard stop of old workers this long after a reload (drains long conns).
+haproxy_hard_stop_after: "30s"
+
 # HAProxy configuration file directory
 # Config file will be: {{ haproxy_config_dir }}/haproxy.cfg
 # SSL certificates directory: {{ haproxy_config_dir }}/certs/

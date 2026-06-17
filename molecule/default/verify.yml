@@ -105,6 +105,19 @@
         success_msg: "Stats hardened: loopback bind, admin off"
 
     # ========================================================================
+    # HAP-22: Hitless-reload prerequisites in global
+    # ========================================================================
+
+    - name: Verify hitless-reload prerequisites in global
+      ansible.builtin.assert:
+        that:
+          - "'expose-fd listeners' in (hap_cfg_stats.content | b64decode)"
+          - "'hard-stop-after 30s' in (hap_cfg_stats.content | b64decode)"
+          - "'/run/haproxy/admin.sock' in (hap_cfg_stats.content | b64decode)"
+        fail_msg: "Global must declare admin socket (outside chroot) + hard-stop-after"
+        success_msg: "Hitless-reload prerequisites present"
+
+    # ========================================================================
     # HAP-16: Source-specific build deps absent in package mode
     # Note: the geerlingguy base image ships gcc/build-essential pre-installed.
     # We assert the role-specific source deps (liblua5.4-dev, libpcre2-dev)

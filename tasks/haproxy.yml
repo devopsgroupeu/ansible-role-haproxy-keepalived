@@ -27,6 +27,14 @@
     group: haproxy
     mode: "0750"
 
+- name: Create HAProxy admin socket directory
+  ansible.builtin.file:
+    path: "{{ haproxy_admin_socket_dir }}"
+    state: directory
+    owner: root
+    group: "{{ haproxy_group }}"
+    mode: "0750"
+
 - name: Copy HAProxy configuration
   ansible.builtin.template:
     src: haproxy.cfg.j2
