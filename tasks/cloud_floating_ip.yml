@@ -21,23 +21,26 @@
       Store API token in Ansible Vault for security!
     success_msg: "Cloud Floating IP configuration validated"
 
-- name: Deploy cloud Floating IP env file (token)
+- name: Install curl and jq for API calls
+  ansible.builtin.package:
+    name:
+      - curl
+      - jq
+    state: present
+  become: true
+
+- name: Deploy cloud Floating IP credentials env file
   ansible.builtin.copy:
     dest: "{{ keepalived_config_dir }}/cloud-floating-ip.env"
-    content: |
-      CLOUD_API_TOKEN={{ cloud_api_token }}
     owner: root
     group: root
     mode: "0600"
+    content: |
+      CLOUD_API_TOKEN={{ cloud_api_token }}
+      FLOATING_IP={{ cloud_floating_ip_address }}
+  become: true
   no_log: true
-  become: true
   notify: Restart keepalived
-
-- name: Install curl for API calls
-  ansible.builtin.package:
-    name: curl
-    state: present
-  become: true
 
 - name: Deploy cloud Floating IP notify script
   ansible.builtin.template:
@@ -51,11 +54,11 @@
 
 - name: Create log file for cloud Floating IP script
   ansible.builtin.file:
-    path: /var/log/cloud-floating-ip.log
+    path: "{{ cloud_floating_ip_log }}"
     state: touch
     owner: root
     group: root
-    mode: '0640'
+    mode: '0600'
     modification_time: preserve
     access_time: preserve
   become: true
@@ -103,8 +106,8 @@
       ExecStart=/bin/bash -c '\
         sleep 5; \
         STATE=$(journalctl -u keepalived -n 50 --no-pager | grep -oE "Entering (MASTER|BACKUP|FAULT) STATE" | tail -1 | awk "{print \$2}"); \
-        if [ "$STATE" = "MASTER" ]; then \
-          /usr/local/bin/cloud-floating-ip-notify.sh MASTER; \
+        if [ -n "$STATE" ]; then \
+          /usr/local/bin/cloud-floating-ip-notify.sh "$STATE"; \
         fi'
 
       [Install]

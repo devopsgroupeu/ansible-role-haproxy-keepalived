@@ -1,108 +1,75 @@
 #!/bin/bash
 #
-# Cloud Floating IP Failover Script
-# Automatically assigns cloud Floating IP to the current MASTER server
-#
-# This script is called by Keepalived when VRRP state changes
+# Cloud Floating IP Failover Script (Hetzner Cloud)
+# Reassigns the Hetzner Floating IP to the current MASTER node on VRRP transition.
 # Part of: ansible-role-haproxy-keepalived
 #
-# Supported provider:
-#   - Hetzner Cloud only (Hetzner Cloud v1 API). Other providers require a
-#     different request shape / auth and are not implemented here.
+# Credentials are NOT baked in: they are sourced from a 0600 env file.
 #
 
 set -euo pipefail
 
-# Configuration — secrets live in a 0600 env file, not in this script body
-ENV_FILE="{{ keepalived_config_dir }}/cloud-floating-ip.env"
+ENV_FILE="/etc/keepalived/cloud-floating-ip.env"
 if [ -r "$ENV_FILE" ]; then
     # shellcheck disable=SC1090
-    . "$ENV_FILE"
+    source "$ENV_FILE"
 fi
-FLOATING_IP="{{ cloud_floating_ip_address }}"
+
 FLOATING_IP_INTERFACE="{{ cloud_floating_ip_interface }}"
 SERVER_NAME="{{ cloud_server_name }}"
 API_ENDPOINT="{{ cloud_api_endpoint }}"
-
-# Logging
-LOG_FILE="/var/log/cloud-floating-ip.log"
+LOG_FILE="{{ cloud_floating_ip_log }}"
 
 log() {
-    echo "[$(date +'%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE" >/dev/null
 }
 
-# Validate configuration
-if [ -z "$CLOUD_API_TOKEN" ]; then
-    log "ERROR: CLOUD_API_TOKEN not set"
-    exit 1
-fi
+for cmd in curl jq; do
+    if ! command -v "$cmd" &> /dev/null; then
+        log "ERROR: $cmd not found - required for cloud API calls"
+        exit 1
+    fi
+done
 
-if [ -z "$FLOATING_IP" ]; then
-    log "ERROR: FLOATING_IP not set"
-    exit 1
-fi
+: "${CLOUD_API_TOKEN:?CLOUD_API_TOKEN not set in $ENV_FILE}"
+: "${FLOATING_IP:?FLOATING_IP not set in $ENV_FILE}"
 
-if [ -z "$SERVER_NAME" ]; then
-    log "ERROR: SERVER_NAME not set"
-    exit 1
-fi
+CURL="curl -fsS --connect-timeout 5 --max-time 20 --retry 3 --retry-delay 2 --retry-connrefused"
 
-if [ -z "$API_ENDPOINT" ]; then
-    log "ERROR: API_ENDPOINT not set"
-    exit 1
-fi
-
-if ! command -v curl &> /dev/null; then
-    log "ERROR: curl not found - required for cloud API calls"
-    exit 1
-fi
-
-# Get VRRP state from Keepalived
 STATE="${1:-UNKNOWN}"
-
 log "Keepalived state transition: $STATE on server $SERVER_NAME"
 
 assign_floating_ip() {
-    # Step 1: Get server ID
-    SERVER_RESPONSE=$(curl -s -H "Authorization: Bearer $CLOUD_API_TOKEN" \
-        "${API_ENDPOINT}/servers?name=${SERVER_NAME}")
-
-    SERVER_ID=$(echo "$SERVER_RESPONSE" | grep -o '"id": *[0-9]*' | head -1 | tr -dc '0-9')
-
-    if [ -z "$SERVER_ID" ]; then
+    SERVER_ID=$($CURL -H "Authorization: Bearer $CLOUD_API_TOKEN" \
+        "${API_ENDPOINT}/servers?name=${SERVER_NAME}" \
+        | jq -r --arg n "$SERVER_NAME" '.servers[] | select(.name==$n) | .id' | head -1)
+    if [ -z "$SERVER_ID" ] || [ "$SERVER_ID" = "null" ]; then
         log "ERROR: Could not find server ID for $SERVER_NAME"
-        log "API Response: $SERVER_RESPONSE"
         exit 1
     fi
-
     log "Found server ID: $SERVER_ID"
 
-    # Step 2: Get Floating IP ID
-    FIP_RESPONSE=$(curl -s -H "Authorization: Bearer $CLOUD_API_TOKEN" \
-        "${API_ENDPOINT}/floating_ips?ip=${FLOATING_IP}")
-
-    FIP_ID=$(echo "$FIP_RESPONSE" | grep -o '"id": *[0-9]*' | head -1 | tr -dc '0-9')
-
-    if [ -z "$FIP_ID" ]; then
+    FIP_ID=$($CURL -H "Authorization: Bearer $CLOUD_API_TOKEN" \
+        "${API_ENDPOINT}/floating_ips?ip=${FLOATING_IP}" \
+        | jq -r --arg ip "$FLOATING_IP" '.floating_ips[] | select(.ip==$ip) | .id' | head -1)
+    if [ -z "$FIP_ID" ] || [ "$FIP_ID" = "null" ]; then
         log "ERROR: Could not find Floating IP ID for ${FLOATING_IP}"
-        log "API Response: $FIP_RESPONSE"
         exit 1
     fi
-
     log "Found Floating IP ID: $FIP_ID"
 
-    # Step 3: Assign Floating IP to this server via API
-    ASSIGN_RESPONSE=$(curl -s -X POST \
+    ASSIGN_RESPONSE=$($CURL -X POST \
         -H "Authorization: Bearer $CLOUD_API_TOKEN" \
         -H "Content-Type: application/json" \
         -d "{\"server\": $SERVER_ID}" \
-        "${API_ENDPOINT}/floating_ips/${FIP_ID}/actions/assign")
+        "${API_ENDPOINT}/floating_ips/${FIP_ID}/actions/assign" || true)
 
-    if echo "$ASSIGN_RESPONSE" | grep -q '"action"'; then
-        log "SUCCESS: Floating IP $FLOATING_IP assigned to $SERVER_NAME via API"
+    if echo "$ASSIGN_RESPONSE" | jq -e '.action' >/dev/null 2>&1; then
+        log "SUCCESS: Floating IP $FLOATING_IP assigned to $SERVER_NAME"
+    elif echo "$ASSIGN_RESPONSE" | jq -e '.error.code == "locked"' >/dev/null 2>&1; then
+        log "Floating IP already assigned to this server (treating as success)"
     else
         log "ERROR: Failed to assign Floating IP via API"
-        log "Response: $ASSIGN_RESPONSE"
         exit 1
     fi
 }
@@ -111,8 +78,6 @@ add_floating_ip_to_interface() {
     if ! ip addr show "$FLOATING_IP_INTERFACE" | grep -q "$FLOATING_IP"; then
         ip addr add "${FLOATING_IP}/32" dev "$FLOATING_IP_INTERFACE"
         log "Added $FLOATING_IP/32 to interface $FLOATING_IP_INTERFACE"
-    else
-        log "$FLOATING_IP already configured on $FLOATING_IP_INTERFACE"
     fi
 }
 
@@ -125,22 +90,14 @@ remove_floating_ip_from_interface() {
 
 case "$STATE" in
     MASTER)
-        log "Transitioning to MASTER - assigning Floating IP $FLOATING_IP to $SERVER_NAME"
         assign_floating_ip
         add_floating_ip_to_interface
-        log "MASTER setup complete - Floating IP $FLOATING_IP is active on $SERVER_NAME"
+        log "MASTER setup complete - Floating IP $FLOATING_IP active on $SERVER_NAME"
         ;;
-
-    BACKUP)
-        log "Transitioning to BACKUP - removing Floating IP from local interface"
+    BACKUP|FAULT)
+        log "Transitioning to $STATE - flushing local Floating IP"
         remove_floating_ip_from_interface
         ;;
-
-    FAULT)
-        log "Keepalived entered FAULT state on $SERVER_NAME - removing Floating IP from local interface"
-        remove_floating_ip_from_interface
-        ;;
-
     *)
         log "Unknown state: $STATE"
         ;;
