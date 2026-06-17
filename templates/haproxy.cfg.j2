@@ -14,6 +14,9 @@ global
     hard-stop-after {{ haproxy_hard_stop_after }}
     stats socket {{ haproxy_admin_socket }} mode 660 level admin expose-fd listeners
     stats socket {{ haproxy_socket_dir }}/stats
+    ssl-default-bind-ciphers {{ haproxy_ssl_default_bind_ciphers }}
+    ssl-default-bind-ciphersuites {{ haproxy_ssl_default_bind_ciphersuites }}
+    ssl-default-bind-options ssl-min-ver {{ haproxy_ssl_min_ver }} no-tls-tickets
 
 defaults
     mode {{ haproxy_mode }}
@@ -52,7 +55,7 @@ listen stats
 
 {% for frontend in haproxy_frontends %}
 frontend {{ frontend.name }}
-    bind {{ frontend.address }}:{{ frontend.port }}{% if frontend.ssl is defined and frontend.ssl == true %} ssl{% endif %}{% if frontend.crts is defined and frontend.crts | length > 0 %} {% for crt in frontend.crts %} crt {{ crt }}{% endfor %}{% endif %}
+    bind {{ frontend.address }}:{{ frontend.port }}{% if frontend.ssl is defined and frontend.ssl == true %} ssl{% if frontend.crts is defined and frontend.crts | length > 0 %}{% for crt in frontend.crts %} crt {{ crt }}{% endfor %}{% endif %} ssl-min-ver {{ frontend.ssl_min_ver | default(haproxy_ssl_min_ver) }}{% if frontend.alpn is defined %} alpn {{ frontend.alpn }}{% endif %}{% endif %}
 
 {% if frontend.default_backend is defined %}
     default_backend {{ frontend.default_backend }}
@@ -62,6 +65,9 @@ frontend {{ frontend.name }}
     option {{ frontend.option | default('httplog') }}
 {% else %}
     option {{ frontend.option | default('tcplog') }}
+{% endif %}
+{% if frontend.redirect_https is defined and frontend.redirect_https %}
+    http-request redirect scheme https unless { ssl_fc }
 {% endif %}
 {% if frontend.http_request is defined %}
     http-request {{ frontend.http_request }}
@@ -110,7 +116,7 @@ backend {{ backend.name }}
 
 {% for listen in haproxy_listens %}
 listen {{ listen.name }}
-    bind {{ listen.address }}:{{ listen.listen_port }}{% if listen.ssl is defined and listen.ssl == true %} ssl{% endif %}{% if listen.crts is defined and listen.crts | length >0 %}{% for crt in listen.crts %} crt {{ crt }}{% endfor %}{% endif %}
+    bind {{ listen.address }}:{{ listen.listen_port }}{% if listen.ssl is defined and listen.ssl == true %} ssl{% if listen.crts is defined and listen.crts | length > 0 %}{% for crt in listen.crts %} crt {{ crt }}{% endfor %}{% endif %} ssl-min-ver {{ listen.ssl_min_ver | default(haproxy_ssl_min_ver) }}{% endif %}
 
 {% if listen.httpcheck %}
     option httpchk {% if listen.httpcheck_method is defined %}{{ listen.httpcheck_method }}{% endif %}

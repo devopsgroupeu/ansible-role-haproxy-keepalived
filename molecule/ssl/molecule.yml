@@ -1,0 +1,65 @@
+---
+dependency:
+  name: galaxy
+driver:
+  name: docker
+platforms:
+  - name: proxy-ssl
+    image: geerlingguy/docker-${MOLECULE_DISTRO:-ubuntu2404}-ansible:latest
+    command: ""
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cgroupns_mode: host
+    privileged: true
+    pre_build_image: true
+    networks:
+      - name: molecule-network
+    groups:
+      - proxy_hosts
+provisioner:
+  name: ansible
+  config_options:
+    defaults:
+      interpreter_python: auto_silent
+    ssh_connection:
+      pipelining: false
+  inventory:
+    group_vars:
+      all:
+        haproxy_loadbalancer_master: "proxy-ssl"
+        haproxy_loadbalancer_backup: "proxy-ssl-b"
+        loadbalancer_master: "proxy-ssl"
+        loadbalancer_backup: "proxy-ssl-b"
+        keepalived_enabled: false
+        haproxy_stats_page_pass: "test_password_123456"
+        haproxy_frontends:
+          - name: https_fe
+            address: "127.0.0.1"
+            port: 8443
+            default_backend: web_be
+            mode: http
+            ssl: true
+            redirect_https: true
+            crts:
+              - /etc/haproxy/certs/test.pem
+        haproxy_backends:
+          - name: web_be
+            mode: http
+            balance: roundrobin
+            servers:
+              - name: app1
+                address: 127.0.0.1
+                port: 9999
+verifier:
+  name: ansible
+scenario:
+  test_sequence:
+    - dependency
+    - destroy
+    - syntax
+    - create
+    - prepare
+    - converge
+    - idempotence
+    - verify
+    - destroy

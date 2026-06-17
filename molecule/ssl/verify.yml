@@ -1,0 +1,23 @@
+---
+- name: Verify SSL hardening
+  hosts: proxy_hosts
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Read rendered HAProxy config
+      ansible.builtin.slurp:
+        src: /etc/haproxy/haproxy.cfg
+      register: ssl_cfg
+
+    - name: Assert SSL hardening rendered
+      ansible.builtin.assert:
+        that:
+          - "'ssl-default-bind-options ssl-min-ver TLSv1.2 no-tls-tickets' in (ssl_cfg.content | b64decode)"
+          - "'ssl-min-ver TLSv1.2' in (ssl_cfg.content | b64decode)"
+          - "'http-request redirect scheme https unless { ssl_fc }' in (ssl_cfg.content | b64decode)"
+        fail_msg: "SSL hardening (min-ver / ciphers / redirect) not rendered"
+        success_msg: "SSL hardening rendered"
+
+    - name: Validate config parses with SSL bind
+      ansible.builtin.command: haproxy -c -f /etc/haproxy/haproxy.cfg
+      changed_when: false

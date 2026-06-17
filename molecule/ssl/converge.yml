@@ -1,0 +1,9 @@
+---
+- name: Converge SSL scenario
+  hosts: proxy_hosts
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Include role
+      ansible.builtin.include_role:
+        name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}"

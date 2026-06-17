@@ -1,0 +1,30 @@
+---
+- name: Prepare SSL test environment
+  hosts: all
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Install iproute2 + openssl (Debian/Ubuntu)
+      ansible.builtin.package:
+        name:
+          - iproute2
+          - openssl
+        state: present
+      when: ansible_os_family == 'Debian'
+
+    - name: Ensure certs directory exists
+      ansible.builtin.file:
+        path: /etc/haproxy/certs
+        state: directory
+        mode: "0750"
+
+    - name: Generate a self-signed PEM for HAProxy
+      ansible.builtin.shell: |
+        set -o pipefail
+        openssl req -x509 -newkey rsa:2048 -nodes -keyout /tmp/k.pem -out /tmp/c.pem \
+          -days 1 -subj "/CN=test.local" 2>/dev/null
+        cat /tmp/c.pem /tmp/k.pem > /etc/haproxy/certs/test.pem
+        chmod 0640 /etc/haproxy/certs/test.pem
+      args:
+        executable: /bin/bash
+        creates: /etc/haproxy/certs/test.pem

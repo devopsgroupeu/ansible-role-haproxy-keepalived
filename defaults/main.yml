@@ -106,6 +106,11 @@ haproxy_log_facility: local2
 # Default mode for frontends/backends (http or tcp)
 haproxy_mode: http
 
+# SSL/TLS hardening (applied to global ssl-default-bind-* and per-bind ssl-min-ver).
+haproxy_ssl_min_ver: "TLSv1.2"
+haproxy_ssl_default_bind_ciphers: "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305"
+haproxy_ssl_default_bind_ciphersuites: "TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256"
+
 # HAProxy global options for the defaults section
 # Common options:
 #   - httplog: Enable HTTP request logging
