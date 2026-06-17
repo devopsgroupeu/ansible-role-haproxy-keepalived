@@ -139,18 +139,10 @@
     - Cleanup haproxy config backups
 
 - name: Configure the rsyslog configuration file to accept UDP syslog reception
-  ansible.builtin.copy:
+  ansible.builtin.template:
+    src: haproxy-rsyslog.conf.j2
     dest: "/etc/rsyslog.d/haproxy.conf"
     mode: "0644"
-    content: |
-      # Provides UDP syslog reception
-      $ModLoad imudp
-      $UDPServerAddress 127.0.0.1
-      $UDPServerRun 514
-
-      # Creating separate log files based on the severity
-      local0.* /var/log/haproxy-traffic.log
-      local0.notice /var/log/haproxy-admin.log
   notify: Restart rsyslog
 
 - name: Ensure HAProxy service is running

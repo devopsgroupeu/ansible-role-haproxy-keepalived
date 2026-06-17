@@ -1,0 +1,9 @@
+{{ ansible_managed | comment }}
+# Provides UDP syslog reception
+$ModLoad imudp
+$UDPServerAddress 127.0.0.1
+$UDPServerRun 514
+
+# Creating separate log files based on the severity
+{{ haproxy_log_facility }}.* /var/log/haproxy-traffic.log
+{{ haproxy_log_facility }}.notice /var/log/haproxy-admin.log
