@@ -69,9 +69,18 @@ frontend {{ frontend.name }}
 {% if frontend.redirect_https is defined and frontend.redirect_https %}
     http-request redirect scheme https unless { ssl_fc }
 {% endif %}
-{% if frontend.http_request is defined %}
-    http-request {{ frontend.http_request }}
-{% endif %}
+{% for acl in frontend.acls | default([]) %}
+    acl {{ acl }}
+{% endfor %}
+{% for rule in frontend.http_request_rules | default([]) %}
+    http-request {{ rule }}
+{% endfor %}
+{% for rule in frontend.http_response_rules | default([]) %}
+    http-response {{ rule }}
+{% endfor %}
+{% for ub in frontend.use_backends | default([]) %}
+    use_backend {{ ub.backend }} {{ ub.condition }}
+{% endfor %}
 {% if frontend.no_log is defined and frontend.no_log %}
     no log
 {% endif %}
@@ -97,6 +106,12 @@ backend {{ backend.name }}
 {% endif %}
     balance {{ backend.balance | default(haproxy_backend_default_balance) }}
     mode {{ backend.mode | default('http') }}
+{% for rule in backend.http_request_rules | default([]) %}
+    http-request {{ rule }}
+{% endfor %}
+{% for rule in backend.http_response_rules | default([]) %}
+    http-response {{ rule }}
+{% endfor %}
 {% if backend.http_send_name_header is defined %}
     http-send-name-header {{ backend.http_send_name_header }}
 {% endif %}
@@ -124,6 +139,12 @@ listen {{ listen.name }}
 
     balance {{ listen.balance | default(haproxy_listen_default_balance) }}
     mode {{ listen.mode | default('tcp') }}
+{% for rule in listen.http_request_rules | default([]) %}
+    http-request {{ rule }}
+{% endfor %}
+{% for rule in listen.http_response_rules | default([]) %}
+    http-response {{ rule }}
+{% endfor %}
 {% for server in listen.servers %}
 {% if server is mapping and server.name is defined %}
     server {{ server.name }} {{ server.address | default(hostvars[server.name]['ansible_default_ipv4']['address']) }}:{{ server.port | default(listen.port) }}{% if listen.options is defined %} {{ listen.options | join(' ') }}{% endif %}

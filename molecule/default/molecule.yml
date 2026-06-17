@@ -77,6 +77,15 @@ provisioner:
             port: 8080
             default_backend: test_backend
             mode: http
+            acls:
+              - "is_health path /healthz"
+            use_backends:
+              - backend: test_backend
+                condition: "if is_health"
+            http_request_rules:
+              - "set-header X-Test 1"
+            http_response_rules:
+              - "set-header X-Frame-Options DENY"
         haproxy_backends:
           - name: test_backend
             balance: roundrobin

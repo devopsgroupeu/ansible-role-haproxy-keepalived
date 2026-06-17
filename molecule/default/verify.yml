@@ -116,6 +116,20 @@
         success_msg: "http-server-close not present by default"
 
     # ========================================================================
+    # HAP-25: ACL content routing and rule sets
+    # ========================================================================
+
+    - name: Verify content routing and rule sets render
+      ansible.builtin.assert:
+        that:
+          - "'acl is_health path /healthz' in (hap_cfg_stats.content | b64decode)"
+          - "'use_backend test_backend if is_health' in (hap_cfg_stats.content | b64decode)"
+          - "'http-request set-header X-Test 1' in (hap_cfg_stats.content | b64decode)"
+          - "'http-response set-header X-Frame-Options DENY' in (hap_cfg_stats.content | b64decode)"
+        fail_msg: "ACL/use_backend/http rule sets did not render"
+        success_msg: "Content routing and rule sets rendered"
+
+    # ========================================================================
     # HAP-22: Hitless-reload prerequisites in global
     # ========================================================================
 

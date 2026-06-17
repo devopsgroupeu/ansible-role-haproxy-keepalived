@@ -176,7 +176,10 @@ haproxy_stats_page_pass: "admin"  # ⚠️  MUST BE CHANGED - validation will fa
 #   - crts: List of certificate paths for SSL (requires ssl: true)
 #   - monitor_uri: Health check endpoint (e.g., "/health")
 #   - monitor_fail: Condition to fail health check
-#   - http_request: Custom HTTP request rules
+#   - acls: List of raw ACL definition strings (e.g. "is_api path_beg /api")
+#   - use_backends: List of {backend, condition} for content routing
+#   - http_request_rules: List of raw http-request rule strings
+#   - http_response_rules: List of raw http-response rule strings
 #   - no_log: Disable logging for this frontend (default: false)
 #   - option: Override default logging option (httplog or tcplog)
 #
