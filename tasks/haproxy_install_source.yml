@@ -100,16 +100,18 @@
       register: haproxy_compile
       changed_when: haproxy_compile.rc == 0
 
-    # Idempotency: this task runs only inside the haproxy_installation_required
-    # block and is further guarded by the compile `creates:` guard above, so
-    # no additional `when: haproxy_compile is changed` guard is needed here.
-    - name: Install HAProxy binaries
+    # Run make install only when the compile step actually ran (i.e. the binary
+    # was not already present).  The compile task's `creates:` skips it when
+    # haproxy-{{ haproxy_version }}/haproxy exists, so haproxy_compile will not
+    # be `changed` in that case, and this task is skipped as well.
+    - name: Install HAProxy binaries  # noqa: no-handler
       ansible.builtin.command:
         cmd: make install
       args:
         chdir: "{{ haproxy_install_dir }}/haproxy-{{ haproxy_version }}"
       register: haproxy_install
       changed_when: haproxy_install.rc == 0
+      when: haproxy_compile is changed
 
     - name: Generate systemd service HAProxy file
       ansible.builtin.command:
