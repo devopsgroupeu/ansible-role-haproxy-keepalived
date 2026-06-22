@@ -454,7 +454,10 @@ keepalived_sync_groups: []
 #     priority: 110
 #     state: MASTER
 
-# keepalived_vrrp_instances is required (no default stub — validate.yml enforces it).
+# Default empty: keepalived needs at least one instance only when keepalived_enabled
+# is true (validate.yml enforces that conditionally). Set keepalived_enabled: false
+# for an HAProxy-only deployment.
+keepalived_vrrp_instances: []
 # Example:
 # keepalived_vrrp_instances:
 #   - vrrp_instance_name: VI_1

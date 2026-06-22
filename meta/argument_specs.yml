@@ -426,8 +426,11 @@ argument_specs:
       keepalived_vrrp_instances:
         type: list
         elements: dict
-        required: true
-        description: VRRP instances (one floating VIP each).
+        required: false
+        default: []
+        description: >-
+          VRRP instances (one floating VIP each). Required (non-empty) only when
+          keepalived_enabled is true — enforced conditionally in validate.yml.
         options:
           vrrp_instance_name:
             type: str

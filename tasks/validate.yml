@@ -76,6 +76,16 @@
         fail_msg: "Keepalived version must be 2.0 or higher. Current: {{ keepalived_version | default('not set') }}"
         success_msg: "Keepalived version {{ keepalived_version }} is valid"
 
+    - name: Require at least one VRRP instance when Keepalived is enabled
+      ansible.builtin.assert:
+        that:
+          - keepalived_vrrp_instances | length > 0
+        fail_msg: |
+          keepalived_enabled is true but keepalived_vrrp_instances is empty.
+          Define at least one VRRP instance (virtual_ipaddress, virtual_router_id,
+          vrrp_instance_name), or set keepalived_enabled: false for an HAProxy-only node.
+        success_msg: "At least one VRRP instance is defined"
+
     - name: Validate each VRRP instance configuration
       loop: "{{ keepalived_vrrp_instances }}"
       loop_control:
