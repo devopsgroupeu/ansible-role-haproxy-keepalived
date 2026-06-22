@@ -45,5 +45,5 @@ vault_cloud_api_token: "your-cloud-api-token-here"
 # Rekey:     ansible-vault rekey vault.yml
 #
 # Run playbook with vault:
-#   ansible-playbook -i examples/inventory/proxy_hosts.ini playbook.yml --ask-vault-pass
+#   ansible-playbook -i examples/inventory/proxy_hosts.yml playbook.yml --ask-vault-pass
 # ============================================================================

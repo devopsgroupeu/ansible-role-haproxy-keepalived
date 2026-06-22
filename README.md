@@ -58,15 +58,25 @@ package mode the version follows the distribution / configured repo.
 
 ### 1. Inventory
 
-```ini
-[proxy_hosts]
-proxy-01 ansible_host=10.0.0.2 ansible_user=root
-proxy-02 ansible_host=10.0.0.3 ansible_user=root
-
-[app_servers]
-app-01 ansible_host=10.0.1.10
-app-02 ansible_host=10.0.1.11
-app-03 ansible_host=10.0.1.12
+```yaml
+all:
+  children:
+    proxy_hosts:
+      hosts:
+        proxy-01:
+          ansible_host: 10.0.0.2
+          ansible_user: root
+        proxy-02:
+          ansible_host: 10.0.0.3
+          ansible_user: root
+    app_servers:
+      hosts:
+        app-01:
+          ansible_host: 10.0.1.10
+        app-02:
+          ansible_host: 10.0.1.11
+        app-03:
+          ansible_host: 10.0.1.12
 ```
 
 ### 2. Playbook
@@ -109,7 +119,7 @@ app-03 ansible_host=10.0.1.12
 ### 3. Run
 
 ```bash
-ansible-playbook -i examples/inventory/proxy_hosts.ini playbook.yml
+ansible-playbook -i examples/inventory/proxy_hosts.yml playbook.yml
 ```
 
 ### 4. Access

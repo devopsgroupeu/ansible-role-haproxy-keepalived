@@ -1,12 +1,19 @@
 # Example inventory for ansible-role-haproxy-keepalived
 #
-# The role reads from the [proxy_hosts] group for:
+# The role reads from the proxy_hosts group for:
 #   - keepalived unicast peer auto-discovery (keepalived_peer_group: proxy_hosts)
 #   - HAProxy + Keepalived installation on all nodes in this group
 #
 # Both nodes run HAProxy; Keepalived assigns the VIP to the master
 # (haproxy_loadbalancer_master) and fails over to the backup on failure.
 
-[proxy_hosts]
-proxy-01 ansible_host=10.0.0.2 ansible_user=root
-proxy-02 ansible_host=10.0.0.3 ansible_user=root
+all:
+  children:
+    proxy_hosts:
+      hosts:
+        proxy-01:
+          ansible_host: 10.0.0.2
+          ansible_user: root
+        proxy-02:
+          ansible_host: 10.0.0.3
+          ansible_user: root

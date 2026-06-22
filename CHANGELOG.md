@@ -56,7 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   roles.
 - `.github/ISSUE_TEMPLATE/`, `PULL_REQUEST_TEMPLATE.md`, `RELEASE_DRAFTER.yml`,
   `dependabot.yml` — GitHub repository templates.
-- `examples/inventory/proxy_hosts.ini` — example inventory showing the `proxy_hosts`
+- `examples/inventory/proxy_hosts.yml` — example inventory showing the `proxy_hosts`
   group expected by this role.
 
 ### Changed

@@ -148,10 +148,17 @@ cloud_floating_ip_address: "95.217.27.127"  # Change to your Hetzner Floating IP
 #    # Add your actual API token and passwords
 #    ansible-vault encrypt vault.yml
 #
-# 2. Create inventory.ini:
-#    [proxy_hosts]
-#    proxy-01 ansible_host=89.167.7.98 ansible_user=root
-#    proxy-02 ansible_host=X.X.X.X ansible_user=root
+# 2. Create inventory.yml (examples/inventory/proxy_hosts.yml):
+#    all:
+#      children:
+#        proxy_hosts:
+#          hosts:
+#            proxy-01:
+#              ansible_host: 89.167.7.98
+#              ansible_user: root
+#            proxy-02:
+#              ansible_host: X.X.X.X
+#              ansible_user: root
 #
 # 3. Create playbook.yml:
 #    ---
@@ -168,7 +175,7 @@ cloud_floating_ip_address: "95.217.27.127"  # Change to your Hetzner Floating IP
 #        - ansible-role-haproxy-keepalived
 #
 # 4. Run playbook:
-#    ansible-playbook -i examples/inventory/proxy_hosts.ini playbook.yml --ask-vault-pass
+#    ansible-playbook -i examples/inventory/proxy_hosts.yml playbook.yml --ask-vault-pass
 #
 # 5. Test failover:
 #    # Stop keepalived on master
