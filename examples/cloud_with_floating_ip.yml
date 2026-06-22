@@ -168,7 +168,7 @@ cloud_floating_ip_address: "95.217.27.127"  # Change to your Hetzner Floating IP
 #        - ansible-role-haproxy-keepalived
 #
 # 4. Run playbook:
-#    ansible-playbook -i inventory.ini playbook.yml --ask-vault-pass
+#    ansible-playbook -i examples/inventory/proxy_hosts.ini playbook.yml --ask-vault-pass
 #
 # 5. Test failover:
 #    # Stop keepalived on master

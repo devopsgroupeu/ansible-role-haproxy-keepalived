@@ -109,7 +109,7 @@ app-03 ansible_host=10.0.1.12
 ### 3. Run
 
 ```bash
-ansible-playbook -i inventory.ini playbook.yml
+ansible-playbook -i examples/inventory/proxy_hosts.ini playbook.yml
 ```
 
 ### 4. Access
