@@ -4,7 +4,7 @@
 
 - name: Create certificate directory
   ansible.builtin.file:
-    path: /etc/haproxy/certs
+    path: "{{ haproxy_config_dir }}/certs"
     state: directory
     owner: root
     group: haproxy
@@ -13,7 +13,7 @@
 - name: Deploy SSL certificates
   ansible.builtin.copy:
     src: "{{ haproxy_ssl_cert_src }}"
-    dest: /etc/haproxy/certs/
+    dest: "{{ haproxy_config_dir }}/certs/"
     owner: root
     group: haproxy
     mode: "0640"

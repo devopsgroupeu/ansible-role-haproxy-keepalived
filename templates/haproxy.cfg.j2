@@ -4,7 +4,11 @@
 {{ haproxy_config }}
 {% else %}
 global
+{% if haproxy_journald | bool %}
+    log /dev/log {{ haproxy_log_facility }}
+{% else %}
     log 127.0.0.1 {{ haproxy_log_facility }}
+{% endif %}
     chroot {{ haproxy_socket_dir }}
     pidfile /var/run/haproxy.pid
     maxconn {{ haproxy_maxconn }}

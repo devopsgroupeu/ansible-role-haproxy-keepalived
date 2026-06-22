@@ -454,10 +454,12 @@ keepalived_sync_groups: []
 #     priority: 110
 #     state: MASTER
 
-keepalived_vrrp_instances:
-  - vrrp_instance_name: VI_1
-    virtual_ipaddress: ""  # ⚠️  MUST BE SET - validation will fail if empty
-    virtual_router_id: 100
+# keepalived_vrrp_instances is required (no default stub — validate.yml enforces it).
+# Example:
+# keepalived_vrrp_instances:
+#   - vrrp_instance_name: VI_1
+#     virtual_ipaddress: "10.0.0.100"   # ⚠️  MUST BE SET
+#     virtual_router_id: 100
 
 # ============================================================================
 # Directory Configuration
