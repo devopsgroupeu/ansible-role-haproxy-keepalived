@@ -29,7 +29,7 @@
         success_msg: "HAProxy is installed"
 
     - name: Locate the haproxy binary
-      ansible.builtin.shell: command -v haproxy
+      ansible.builtin.command: which haproxy
       register: haproxy_which
       changed_when: false
 
