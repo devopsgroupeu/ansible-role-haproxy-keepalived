@@ -48,6 +48,8 @@ jobs:
       matrix:
         distro:
           - ubuntu2404
+          - debian12
+          - debian13
           - rockylinux9
         scenario:
           - default
