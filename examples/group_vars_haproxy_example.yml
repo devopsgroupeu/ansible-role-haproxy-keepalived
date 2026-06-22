@@ -22,7 +22,7 @@ haproxy_loadbalancer_backup: "proxy-backup-hostname"
 # HAProxy Statistics Configuration
 haproxy_stats: true
 haproxy_stats_port: 1936
-haproxy_stats_bind_addr: "0.0.0.0"
+haproxy_stats_bind_addr: "127.0.0.1"
 haproxy_stats_page_user: "{{ vault_haproxy_stats_user | default('admin') }}"
 haproxy_stats_page_pass: "{{ vault_haproxy_stats_pass }}"
 haproxy_stats_page_uri: "/haproxy/stats"
@@ -32,7 +32,6 @@ haproxy_mode: http
 haproxy_options:
   - httplog
   - dontlognull
-  - http-server-close
   - forwardfor except 127.0.0.0/8
   - redispatch
 haproxy_retries: 3
@@ -139,7 +138,7 @@ haproxy_listens: []
 
 keepalived_enabled: true
 keepalived_network_interface: eth0
-keepalived_version: 2.3.2
+keepalived_version: "2.3.4"
 keepalived_vrrp_instances:
   - vrrp_instance_name: VI_1
     virtual_ipaddress: "10.0.1.100"  # Set your virtual IP here

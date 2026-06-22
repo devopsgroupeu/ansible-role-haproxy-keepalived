@@ -34,7 +34,7 @@ The master receives Keepalived priority 100, the backup receives 90. Both run HA
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `haproxy_enabled` | `true` | Install and configure HAProxy |
-| `haproxy_version` | `3.1.4` | Version to install from source |
+| `haproxy_version` | `3.4.0` | Version to install from source (LTS; package mode ignores this) |
 | `haproxy_config` | `""` | Full config as a string — bypasses all template generation |
 | `haproxy_user` | `haproxy` | System user for the HAProxy process |
 | `haproxy_group` | `haproxy` | System group for the HAProxy process |
@@ -55,7 +55,6 @@ Default `haproxy_options`:
 haproxy_options:
   - httplog
   - dontlognull
-  - http-server-close
   - forwardfor except 127.0.0.0/8
   - redispatch
 ```
@@ -68,7 +67,7 @@ haproxy_options:
 |----------|---------|-------------|
 | `haproxy_stats` | `true` | Enable the statistics page |
 | `haproxy_stats_port` | `1936` | Port to listen on |
-| `haproxy_stats_bind_addr` | `0.0.0.0` | Bind address (`127.0.0.1` for localhost only) |
+| `haproxy_stats_bind_addr` | `127.0.0.1` | Bind address — loopback by default; widen only if firewalled |
 | `haproxy_stats_page_uri` | `/haproxy/stats` | URI path |
 | `haproxy_stats_page_user` | `admin` | Username — **change this** |
 | `haproxy_stats_page_pass` | `admin` | Password — **change this, use Vault** |
@@ -207,7 +206,7 @@ haproxy_listens: []
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `keepalived_enabled` | `true` | Install and configure Keepalived |
-| `keepalived_version` | `2.3.2` | Version to install from source |
+| `keepalived_version` | `2.3.4` | Version to install from source (package mode ignores this) |
 | `keepalived_network_interface` | `eth0` | Interface to bind VRRP to — run `ip link` to confirm |
 | `keepalived_unicast` | `true` | Use unicast instead of multicast (required for most cloud/VM environments) |
 

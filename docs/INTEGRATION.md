@@ -2,23 +2,47 @@
 
 Guide for integrating HAProxy + Keepalived with various systems and cloud providers.
 
+## Consuming via requirements.yml
+
+Install from Ansible Galaxy:
+
+```bash
+ansible-galaxy role install devopsgroupeu.haproxy_keepalived
+```
+
+Or pin a version via `requirements.yml`:
+
+```yaml
+---
+roles:
+  - name: devopsgroupeu.haproxy_keepalived
+    src: https://github.com/devopsgroupeu/ansible-role-haproxy-keepalived
+    version: "v2.0.0"
+    scm: git
+```
+
+This role is typically used together with [`devopsgroupeu.rke2`](https://github.com/devopsgroupeu/ansible-role-rke2):
+the HAProxy VIP (`haproxy_vip_address`) becomes the RKE2 `rke2_vip_address` (or the server URL for agents).
+
 ## Kubernetes / Container Platform Integration
 
 ### Kubernetes API Load Balancing
+
+Hosts in the `server_nodes` inventory group are the RKE2 control-plane nodes.
 
 ```yaml
 haproxy_frontends:
   - name: k8s_api
     address: "*"
     port: 6443
-    default_backend: k8s_masters
+    default_backend: k8s_api_servers
     mode: tcp
 
 haproxy_backends:
-  - name: k8s_masters
+  - name: k8s_api_servers
     balance: roundrobin
     mode: tcp
-    servers: "{{ groups['k8s_masters'] | default([]) }}"
+    servers: "{{ groups['server_nodes'] | default([]) }}"
     port: 6443
     options:
       - check
@@ -46,7 +70,7 @@ haproxy_backends:
   - name: k8s_api_backend
     balance: roundrobin
     mode: tcp
-    servers: "{{ groups['k8s_masters'] | default([]) }}"
+    servers: "{{ groups['server_nodes'] | default([]) }}"
     port: 6443
     options:
       - check
@@ -54,7 +78,7 @@ haproxy_backends:
   - name: k8s_join_backend
     balance: roundrobin
     mode: tcp
-    servers: "{{ groups['k8s_masters'] | default([]) }}"
+    servers: "{{ groups['server_nodes'] | default([]) }}"
     port: 9345
     options:
       - check
@@ -232,7 +256,7 @@ Ansible controller and point the role at them with the offline variables:
 ```bash
 # On an internet-connected machine
 wget https://www.haproxy.org/download/3.4/src/haproxy-3.4.0.tar.gz
-wget https://www.keepalived.org/software/keepalived-2.3.2.tar.gz
+wget https://www.keepalived.org/software/keepalived-2.3.4.tar.gz
 ```
 
 ```yaml
@@ -241,7 +265,7 @@ haproxy_offline_install: true
 haproxy_src_local_path: "/path/on/controller/haproxy-3.4.0.tar.gz"
 
 keepalived_offline_install: true
-keepalived_src_local_path: "/path/on/controller/keepalived-2.3.2.tar.gz"
+keepalived_src_local_path: "/path/on/controller/keepalived-2.3.4.tar.gz"
 ```
 
 The role copies the tarballs from the controller path to `haproxy_install_dir` on

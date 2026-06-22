@@ -156,7 +156,8 @@ graph TD
 ### How failover works
 
 Keepalived runs a `vrrp_script` (`haproxy_check`) that calls
-`service haproxy status` every 2s (`interval 2`, `fall 2`, `rise 2`).
+`/usr/bin/systemctl is-active --quiet haproxy` every 2s (`interval 2`, `fall 2`, `rise 2`).
+Override with `keepalived_haproxy_check_script` if your systemd binary is elsewhere.
 
 - **Healthy:** master holds base priority **100**, backup **90**; the VIP
   sits on the master.
@@ -199,7 +200,7 @@ The role identifies the master and backup nodes by hostname using `haproxy_loadb
 | `haproxy_timeout_check` | `10s` | Health check timeout |
 | `haproxy_stats` | `true` | Enable the HAProxy statistics page |
 | `haproxy_stats_port` | `1936` | Statistics page port |
-| `haproxy_stats_bind_addr` | `0.0.0.0` | Statistics page bind address |
+| `haproxy_stats_bind_addr` | `127.0.0.1` | Statistics page bind address — loopback by default |
 | `haproxy_stats_page_user` | `admin` | Statistics page username |
 | `haproxy_stats_page_pass` | — | Statistics page password (use Vault) |
 | `haproxy_stats_page_uri` | `/haproxy/stats` | Statistics page URI |

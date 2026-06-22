@@ -21,7 +21,7 @@ Please do not report security vulnerabilities through public GitHub issues, disc
 
 Instead, please report security vulnerabilities by emailing:
 
-**Email:** info@devopsgroup.sk
+**Email:** security@devopsgroup.sk
 
 Please include the following information in your report:
 
@@ -157,7 +157,7 @@ _No security vulnerabilities have been reported yet._
 
 If you have questions about this security policy, please contact:
 
-**Email:** info@devopsgroup.sk
+**Email:** security@devopsgroup.sk
 
 ---
 

@@ -31,8 +31,8 @@ haproxy_user: haproxy
 haproxy_group: haproxy
 
 # Stats page configuration
-haproxy_stats_page_enabled: true
-haproxy_stats_page_port: 1936
+haproxy_stats: true
+haproxy_stats_port: 1936
 haproxy_stats_page_uri: "/haproxy/stats"
 haproxy_stats_page_user: "admin"
 haproxy_stats_page_pass: "{{ vault_haproxy_stats_password }}"  # Store in vault!
@@ -83,7 +83,7 @@ haproxy_backends:
 # Keepalived Configuration
 # ============================================================================
 keepalived_enabled: true
-keepalived_version: 2.3.2
+keepalived_version: "2.3.4"
 
 # Network interface for VRRP (check with 'ip a' on your servers)
 # Cloud Provider typically uses: ens3
@@ -92,7 +92,7 @@ keepalived_network_interface: "ens3"
 
 # VRRP configuration
 # Use unicast mode (required for cloud environments)
-keepalived_vrrp_unicast: true
+keepalived_unicast: true
 
 # VRRP instances
 keepalived_vrrp_instances:

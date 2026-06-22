@@ -5,6 +5,74 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — v2.0.0
+
+> Breaking major release — not backward compatible with v1.x playbooks.
+
+### Breaking Changes
+
+- **Namespace:** `devopsgroup` → `devopsgroupeu` (Galaxy import required new namespace).
+- **`min_ansible_version`:** raised to `2.19`.
+- **`keepalived_vrrp_instances` no longer ships a stub default.** The variable is
+  `required: true` in `meta/argument_specs.yml`; `validate.yml` enforces a valid
+  IP on each instance. Callers that relied on the empty-stub default will now
+  receive a clear validation error.
+- **Install method default:** changed from `source` to `package`. Set
+  `haproxy_install_method: source` / `keepalived_install_method: source` to
+  restore source compilation.
+- Removed phantom/ghost example vars `haproxy_stats_page_enabled`,
+  `haproxy_stats_page_port`, `keepalived_vrrp_unicast` from examples (replaced
+  with correct var names `haproxy_stats`, `haproxy_stats_port`, `keepalived_unicast`).
+
+### Fixed
+
+- **Critical:** `templates/haproxy.cfg.j2` — with `haproxy_journald: true` the
+  global section now conditionally emits `log /dev/log` instead of the UDP
+  rsyslog destination. Previously logs were silently dropped when journald mode
+  was enabled.
+- **Important:** `tasks/haproxy.yml` — SSL cert dir now uses
+  `{{ haproxy_config_dir }}/certs` instead of the hardcoded `/etc/haproxy/certs`
+  so overriding `haproxy_config_dir` works correctly end-to-end.
+- `docs/CONFIGURATION.md`: corrected `haproxy_stats_bind_addr` default from
+  `0.0.0.0` to `127.0.0.1`; corrected `haproxy_version` and `keepalived_version`
+  defaults; removed phantom `http-server-close` from `haproxy_options` example.
+- `README.md`: corrected `haproxy_stats_bind_addr` default; corrected failover
+  description (`service haproxy status` → `/usr/bin/systemctl is-active --quiet haproxy`).
+- `docs/INTEGRATION.md`: backend group `k8s_masters` → `server_nodes` (matches
+  `devopsgroupeu.rke2` inventory group); added Galaxy install / requirements.yml
+  section.
+- `examples/cloud_with_floating_ip.yml`: replaced ghost vars `haproxy_stats_page_enabled`,
+  `haproxy_stats_page_port`, `keepalived_vrrp_unicast` with correct names; updated
+  `keepalived_version` to `2.3.4`.
+- `examples/group_vars_haproxy_example.yml` + `examples/main_yml_haproxy_config.yml`:
+  removed `http-server-close` from options; updated `keepalived_version` to `2.3.4`;
+  corrected `haproxy_stats_bind_addr` to `127.0.0.1`.
+
+### Added
+
+- `.github/workflows/galaxy.yml` — SemVer-tag Galaxy auto-publish (was the only
+  role missing this workflow).
+- `.github/workflows/pre-commit.yml`, `release-drafter.yml` — parity with sibling
+  roles.
+- `.github/ISSUE_TEMPLATE/`, `PULL_REQUEST_TEMPLATE.md`, `RELEASE_DRAFTER.yml`,
+  `dependabot.yml` — GitHub repository templates.
+- `examples/inventory/proxy_hosts.ini` — example inventory showing the `proxy_hosts`
+  group expected by this role.
+
+### Changed
+
+- `meta/main.yml`: description updated to reflect package-install-first default.
+- `.ansible-lint`: added `profile: production` and canonical `enable_list`
+  (`no-log-password`, `loop-var-prefix`).
+- `.gitlab-ci.yml`: pinned to `python:3.12`; replaced ubuntu2204/debian11 with
+  canonical supported matrix (ubuntu2404, debian12, debian13, rockylinux9);
+  standardized yamllint invocation to explicit dir list.
+- `.github/workflows/ci.yml`: collapsed two separate lint jobs into one pip-based
+  `lint` job; added `package`, `ssl`, `cloud-fip` to molecule scenario matrix;
+  added `concurrency` block.
+- `requirements.txt`: unified pin `ansible-core>=2.19,<2.22` (was `>=2.19,<2.20`).
+- Security contact standardized to `security@devopsgroup.sk`.
+
 ## [1.0.0] - 2026-02-04
 
 ### Added
@@ -92,5 +160,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Links
 
 - [Ansible Galaxy](https://galaxy.ansible.com/devopsgroupeu/haproxy_keepalived)
-- [GitLab Repository](https://gitlab.devopsgroup.sk/devopsgroupsk/on-premise-solution/ansible-roles/ansible-role-haproxy-keepalived)
-- [Issues](https://gitlab.devopsgroup.sk/devopsgroupsk/on-premise-solution/ansible-roles/ansible-role-haproxy-keepalived/issues)
+- [GitHub Repository](https://github.com/devopsgroupeu/ansible-role-haproxy-keepalived)
+- [Issues](https://github.com/devopsgroupeu/ansible-role-haproxy-keepalived/issues)
