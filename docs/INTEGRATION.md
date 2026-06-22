@@ -17,12 +17,13 @@ Or pin a version via `requirements.yml`:
 roles:
   - name: devopsgroupeu.haproxy_keepalived
     src: https://github.com/devopsgroupeu/ansible-role-haproxy-keepalived
-    version: "v2.0.0"
+    version: "v1.0.0"
     scm: git
 ```
 
 This role is typically used together with [`devopsgroupeu.rke2`](https://github.com/devopsgroupeu/ansible-role-rke2):
-the HAProxy VIP (`haproxy_vip_address`) becomes the RKE2 `rke2_vip_address` (or the server URL for agents).
+the floating VIP defined in `keepalived_vrrp_instances[].virtual_ipaddress` becomes the
+address RKE2 agents and external clients use to reach the control-plane (the RKE2 server URL).
 
 ## Kubernetes / Container Platform Integration
 
@@ -124,7 +125,6 @@ haproxy_listens:
     servers:
       - mysql01.local
       - mysql02.local
-    port: 3306
     options:
       - check
 ```
@@ -141,7 +141,6 @@ haproxy_listens:
     servers:
       - pg01.local
       - pg02.local
-    port: 5432
     options:
       - check
 ```
@@ -191,8 +190,9 @@ haproxy_frontends:
     port: 443
     default_backend: web_backend
     mode: http
-    ssl_enabled: true
-    ssl_certificate: "/etc/haproxy/certs/example.com.pem"
+    ssl: true
+    crts:
+      - /etc/haproxy/certs/example.com.pem
 ```
 
 **Certificate format:**
@@ -249,29 +249,31 @@ haproxy_backends:
 
 ## Air-Gapped Environments
 
-The role compiles HAProxy and Keepalived from source. In air-gapped environments
-where outbound internet access is blocked, pre-download the source tarballs on the
-Ansible controller and point the role at them with the offline variables:
+Package mode is the default. For an air-gapped source build of HAProxy where
+outbound internet access is blocked, pre-download the HAProxy source tarball on
+the Ansible controller and point the role at it with the offline variables:
 
 ```bash
 # On an internet-connected machine
 wget https://www.haproxy.org/download/3.4/src/haproxy-3.4.0.tar.gz
-wget https://www.keepalived.org/software/keepalived-2.3.4.tar.gz
 ```
 
 ```yaml
 # group_vars or host_vars
+haproxy_install_method: source
 haproxy_offline_install: true
 haproxy_src_local_path: "/path/on/controller/haproxy-3.4.0.tar.gz"
-
-keepalived_offline_install: true
-keepalived_src_local_path: "/path/on/controller/keepalived-2.3.4.tar.gz"
 ```
 
-The role copies the tarballs from the controller path to `haproxy_install_dir` on
+The role copies the tarball from the controller path to `haproxy_install_dir` on
 the target servers and then proceeds with the normal compile/install flow.
-A checksum (`haproxy_src_sha256` / `keepalived_src_sha256`) is still required
-even in offline mode.
+A checksum (`haproxy_src_sha256`) is still required even in offline mode.
+
+> Offline copy-from-controller staging is implemented for HAProxy only. For an
+> air-gapped Keepalived install, host the source tarball on a reachable internal
+> mirror and set `keepalived_install_method: source` with `keepalived_src_sha256`,
+> or install Keepalived via `keepalived_install_method: package` from an internal
+> package repository.
 
 ## High Availability Patterns
 

@@ -37,7 +37,7 @@ jobs:
         run: python -m yamllint .
 
       - name: Run ansible-lint
-        run: ansible-lint
+        run: ansible-lint --profile production .
 
   molecule:
     name: molecule (${{ matrix.distro }} / ${{ matrix.scenario }})

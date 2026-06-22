@@ -74,7 +74,7 @@ systemctl status haproxy
 **Common causes:**
 
 - HAProxy is down on the master node — Keepalived will drop to FAULT state if the tracked service fails. Fix HAProxy first.
-- `keepalived_unicast: true` but nodes can't reach each other on UDP port 112 — check firewall rules between proxy nodes.
+- `keepalived_unicast: true` but nodes can't reach each other on IP protocol 112 (VRRP) — check firewall rules between proxy nodes.
 - `virtual_router_id` collision — another system on the same subnet is using the same ID.
 
 ---
@@ -95,7 +95,7 @@ Expected: within ~3 seconds the backup should log `Entering MASTER state` and th
 
 **Common causes:**
 
-- Firewall blocking VRRP traffic between nodes — allow protocol 112 (VRRP) and/or UDP 112 between proxy hosts.
+- Firewall blocking VRRP traffic between nodes — allow IP protocol 112 (VRRP) between proxy hosts.
 - With `keepalived_unicast: true`, check that `proxy_hosts` inventory group contains both nodes so the unicast peer list is correct.
 - `haproxy_loadbalancer_master` / `haproxy_loadbalancer_backup` set to wrong hostnames — they must match `inventory_hostname` exactly.
 
@@ -173,10 +173,10 @@ openssl s_client -connect <vip>:443 -servername <hostname>
 
 ```bash
 # Check notify script exists
-ls -la /etc/keepalived/
+ls -la /usr/local/bin/cloud-floating-ip-notify.sh
 
 # Run notify script manually to test API call
-/etc/keepalived/cloud-floating-ip-notify.sh MASTER
+/usr/local/bin/cloud-floating-ip-notify.sh MASTER
 
 # Check API token is valid
 curl -H "Authorization: Bearer <token>" https://api.hetzner.cloud/v1/floating_ips

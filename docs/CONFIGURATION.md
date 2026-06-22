@@ -7,13 +7,19 @@ Full variable reference for the HAProxy + Keepalived role. All variables are def
 ## Table of Contents
 
 - [Load Balancer Nodes](#load-balancer-nodes)
+- [Install Method & Source Build](#install-method--source-build)
 - [HAProxy Global](#haproxy-global)
+- [SSL/TLS Hardening](#ssltls-hardening)
 - [HAProxy Statistics](#haproxy-statistics)
 - [Frontends](#frontends)
 - [Backends](#backends)
 - [Listen Sections](#listen-sections)
+- [Raw Config Escape Hatches](#raw-config-escape-hatches)
 - [Keepalived](#keepalived)
+- [Keepalived VRRP Tuning](#keepalived-vrrp-tuning)
+- [Keepalived VRRP Authentication](#keepalived-vrrp-authentication)
 - [Cloud Floating IP](#cloud-floating-ip)
+- [Directories](#directories)
 - [Advanced Examples](#advanced-examples)
 
 ---
@@ -26,6 +32,32 @@ Full variable reference for the HAProxy + Keepalived role. All variables are def
 | `haproxy_loadbalancer_backup` | `""` | `inventory_hostname` of the backup proxy node. **Required.** |
 
 The master receives Keepalived priority 100, the backup receives 90. Both run HAProxy; only the master holds the VIP at any time.
+
+---
+
+## Install Method & Source Build
+
+By default both components install from distribution/repo **packages**. Set the
+`*_install_method` to `source` to compile from upstream tarballs (needed for the
+latest versions, custom build flags, or air-gapped builds).
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `haproxy_install_method` | `package` | `package` (distro/repo) or `source` (compile) |
+| `haproxy_branch` | `""` | Package-mode repo branch (e.g. `3.0`, `3.4`); empty = distro default |
+| `haproxy_binary` | method-aware | Path to the haproxy binary (`/usr/local/sbin` source, `/usr/sbin` package) |
+| `haproxy_src_sha256` | `""` | SHA256 of the source tarball — **required in source mode** (`sha256:<hex>` or a `.sha256` URL) |
+| `haproxy_make_flags_default` | see `defaults/main.yml` | Base `make` flags for source builds |
+| `haproxy_make_flags` | derived | Effective `make` flags (adds QUIC on HAProxy >= 2.9); override to fully customize |
+| `haproxy_remove_build_deps` | `false` | Purge the HAProxy build toolchain after a source install |
+| `haproxy_offline_install` | `false` | Copy a pre-staged tarball from the controller instead of downloading |
+| `haproxy_src_local_path` | `""` | Controller path to the pre-staged HAProxy tarball (offline mode) |
+| `keepalived_install_method` | `package` | `package` or `source` |
+| `keepalived_binary` | method-aware | Path to the keepalived binary |
+| `keepalived_src_sha256` | `""` | SHA256 of the source tarball — **required in source mode** |
+| `keepalived_configure_flags_default` | see `defaults/main.yml` | Base `./configure` flags for source builds |
+| `keepalived_configure_flags` | = default list | Effective `./configure` flags; override the whole list to customize |
+| `keepalived_remove_build_deps` | `{{ haproxy_remove_build_deps }}` | Purge the Keepalived build toolchain after a source install |
 
 ---
 
@@ -59,6 +91,20 @@ haproxy_options:
   - redispatch
 ```
 
+| `haproxy_journald` | `false` | Send HAProxy logs to journald via `/dev/log` instead of rsyslog UDP |
+
+---
+
+## SSL/TLS Hardening
+
+Applied to the global `ssl-default-bind-*` directives and per-bind `ssl-min-ver`.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `haproxy_ssl_min_ver` | `TLSv1.2` | Minimum TLS version accepted on SSL binds |
+| `haproxy_ssl_default_bind_ciphers` | see `defaults/main.yml` | Cipher list for TLS 1.2 and below |
+| `haproxy_ssl_default_bind_ciphersuites` | see `defaults/main.yml` | Cipher suites for TLS 1.3 |
+
 ---
 
 ## HAProxy Statistics
@@ -71,6 +117,7 @@ haproxy_options:
 | `haproxy_stats_page_uri` | `/haproxy/stats` | URI path |
 | `haproxy_stats_page_user` | `admin` | Username — **change this** |
 | `haproxy_stats_page_pass` | `admin` | Password — **change this, use Vault** |
+| `haproxy_stats_admin` | `false` | Enable live backend control (enable/disable/drain) from the stats UI — off by default; opt in explicitly |
 
 > The role's validation will **fail** if `haproxy_stats_page_pass` is left as `"admin"`. Store it in Ansible Vault:
 > ```yaml
@@ -201,6 +248,22 @@ haproxy_listens: []
 
 ---
 
+## Raw Config Escape Hatches
+
+For directives the structured variables do not cover. Content is appended
+verbatim — only validated by `haproxy -c`.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `haproxy_config` | `""` | Full config as a string — bypasses all template generation |
+| `haproxy_global_extra` | `""` | Lines appended to the `global` section |
+| `haproxy_defaults_extra` | `""` | Lines appended to the `defaults` section |
+| `haproxy_custom_sections` | `""` | Appended verbatim at end of file (e.g. `peers` sections) |
+| `haproxy_resolvers` | `[]` | Named DNS resolvers — list of `{name, nameservers: ["id ip:port", ...]}` |
+| `haproxy_errorfiles` | `[]` | Custom error pages — list of `{code, path}` |
+
+---
+
 ## Keepalived
 
 | Variable | Default | Description |
@@ -209,6 +272,10 @@ haproxy_listens: []
 | `keepalived_version` | `2.3.4` | Version to install from source (package mode ignores this) |
 | `keepalived_network_interface` | `eth0` | Interface to bind VRRP to — run `ip link` to confirm |
 | `keepalived_unicast` | `true` | Use unicast instead of multicast (required for most cloud/VM environments) |
+| `keepalived_peer_group` | `proxy_hosts` | Inventory group used for automatic unicast peer discovery |
+| `keepalived_unicast_peers` | `[]` | Explicit unicast peer IPs — overrides auto-discovery from `keepalived_peer_group` |
+| `keepalived_log_facility` | `local1` | Syslog facility set via a systemd drop-in (`-S` flag) |
+| `keepalived_haproxy_check_script` | `/usr/bin/systemctl is-active --quiet haproxy` | Track-script command (absolute path required under script security) |
 
 ### VRRP instances
 
@@ -236,6 +303,41 @@ keepalived_vrrp_instances:
 
 ---
 
+## Keepalived VRRP Tuning
+
+VRRP timing, preemption, and sync-group behaviour (most are per-instance overridable).
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `keepalived_nopreempt` | `false` | When true, a recovered master will NOT reclaim the VIP (both nodes rendered as BACKUP) |
+| `keepalived_preempt_delay` | `0` | Seconds to wait before preempting (`0` = instant; ignored when `nopreempt` is true) |
+| `keepalived_advert_int` | `1` | VRRP advertisement interval in seconds |
+| `keepalived_vrrp_version` | `2` | VRRP protocol version (`2` or `3`) |
+| `keepalived_garp_master_delay` | `0` | Seconds before gratuitous ARP after becoming master (`0` = default) |
+| `keepalived_garp_master_refresh` | `0` | Periodic gratuitous ARP refresh interval in seconds (`0` = disabled) |
+| `keepalived_sync_groups` | `[]` | Sync groups — list of `{name, instances: [...]}` to fail instances over together |
+
+---
+
+## Keepalived VRRP Authentication
+
+Native VRRP authentication (VRRPv2 only). Disabled by default.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `keepalived_auth_type` | `""` | `PASS` or `AH`; empty = no authentication block rendered |
+| `keepalived_auth_pass` | `""` | Shared secret (max 8 chars, cleartext in the VRRP header) — **store in Ansible Vault** |
+
+```yaml
+keepalived_auth_type: "PASS"
+keepalived_auth_pass: "{{ vault_keepalived_auth_pass }}"
+```
+
+> `PASS` is cleartext on the wire and limited to 8 characters — combine with
+> network segmentation / firewalling of VRRP (IP protocol 112).
+
+---
+
 ## Cloud Floating IP
 
 Optional integration that moves a cloud provider floating IP via API when VRRP state changes.
@@ -248,6 +350,7 @@ Optional integration that moves a cloud provider floating IP via API when VRRP s
 | `cloud_floating_ip_address` | `""` | The floating IP to manage |
 | `cloud_server_name` | `{{ inventory_hostname }}` | Server identifier for API calls |
 | `cloud_floating_ip_interface` | `eth0` | Interface to assign floating IP to |
+| `cloud_floating_ip_log` | `/var/log/cloud-floating-ip.log` | Log file for the notify script (raw API bodies are not logged) |
 
 ```yaml
 cloud_floating_ip_enabled: true
@@ -255,6 +358,24 @@ cloud_api_endpoint: "https://api.hetzner.cloud/v1"
 cloud_api_token: "{{ vault_cloud_api_token }}"
 cloud_floating_ip_address: "95.217.1.100"
 ```
+
+---
+
+## Directories
+
+Installation and configuration paths. Generally safe to leave at defaults unless
+you have specific filesystem requirements.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `haproxy_config_dir` | `/etc/haproxy` | HAProxy config directory (`haproxy.cfg`, `certs/`) |
+| `haproxy_socket_dir` | `/var/lib/haproxy` | Runtime directory for Unix sockets and chroot |
+| `haproxy_admin_socket_dir` | `/run/haproxy` | Admin runtime socket dir — must live OUTSIDE `haproxy_socket_dir` (chroot) |
+| `haproxy_admin_socket` | `{{ haproxy_admin_socket_dir }}/admin.sock` | Admin socket path for hitless reloads |
+| `haproxy_hard_stop_after` | `30s` | Force-stop old workers this long after a reload (drains long-lived connections) |
+| `haproxy_install_dir` | `/usr/local/src` | Source compilation directory (source mode only) |
+| `haproxy_ssl_cert_src` | `""` | Controller dir of SSL certs to deploy into `{{ haproxy_config_dir }}/certs/`; empty = none |
+| `keepalived_config_dir` | `/etc/keepalived` | Keepalived config directory (`keepalived.conf`) |
 
 ---
 

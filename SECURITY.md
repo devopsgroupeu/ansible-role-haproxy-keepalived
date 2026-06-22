@@ -87,8 +87,13 @@ When using this Ansible role, we recommend:
    - Use firewall rules to restrict VRRP protocol (IP protocol 112) to trusted nodes
 
 2. **Authentication (Optional Enhancement)**
-   - Consider implementing VRRP authentication in production environments
-   - This requires custom configuration via `haproxy_config` variable
+   - Consider enabling VRRP authentication in production environments (VRRPv2 only)
+   - Set `keepalived_auth_type` (`PASS` or `AH`) and store `keepalived_auth_pass` in Ansible Vault:
+     ```yaml
+     keepalived_auth_type: "PASS"
+     keepalived_auth_pass: "{{ vault_keepalived_auth_pass }}"
+     ```
+   - Note: VRRPv2 `PASS` is cleartext in the VRRP header (max 8 chars) — pair it with network segmentation
 
 ### Infrastructure Security
 
@@ -125,15 +130,19 @@ Keepalived manages Virtual IPs (VIPs) using VRRP protocol, which by default does
 - Firewall rules restricting VRRP traffic
 - Custom Keepalived configuration with authentication
 
-### Compilation from Source
+### Installation Method
 
-This role compiles HAProxy and Keepalived from source, which provides:
+This role installs HAProxy and Keepalived from distribution/repo **packages by
+default** (`haproxy_install_method: package`, `keepalived_install_method: package`).
+Source compilation is opt-in (`*_install_method: source`) for cases that need the
+latest versions, custom build flags, or air-gapped builds:
 
-- **Benefits:** Latest versions, custom build flags, air-gapped support
-- **Risks:** Build-time dependencies must be kept updated
+- **Package mode (default):** patched by the distribution's security updates
+- **Source mode (opt-in):** build-time dependencies and pinned versions must be kept updated
 
 We recommend:
-- Regularly updating `haproxy_version` and `keepalived_version`
+- In package mode, keeping the OS and HAProxy/Keepalived packages patched
+- In source mode, regularly updating `haproxy_version` / `keepalived_version`
 - Monitoring upstream security advisories
 - Testing updates in non-production environments first
 
