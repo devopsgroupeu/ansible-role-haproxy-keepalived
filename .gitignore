@@ -22,12 +22,11 @@ __pycache__/
 
 # Molecule
 .molecule/
-.cache/
+
+# Logs
+*.log
 
 # Testing credentials
 test-hetzner/
 **/vault.yml
 !vault.example.yml
-
-# Logs
-*.log
