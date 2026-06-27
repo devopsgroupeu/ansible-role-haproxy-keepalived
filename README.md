@@ -1,12 +1,11 @@
 # Ansible Role - HAProxy + Keepalived
 
+[![CI](https://github.com/devopsgroupeu/ansible-role-haproxy-keepalived/actions/workflows/ci.yml/badge.svg)](https://github.com/devopsgroupeu/ansible-role-haproxy-keepalived/actions/workflows/ci.yml)
 [![Ansible Galaxy](https://img.shields.io/badge/Ansible%20Galaxy-devopsgroupeu.haproxy--keepalived-blue?logo=ansible)](https://galaxy.ansible.com/ui/standalone/roles/devopsgroupeu/haproxy-keepalived/)
-![GitHub License](https://img.shields.io/github/license/devopsgroupeu/ansible-role-haproxy-keepalived)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 ![GitHub Forks](https://img.shields.io/github/forks/devopsgroupeu/ansible-role-haproxy-keepalived)
 ![GitHub Stars](https://img.shields.io/github/stars/devopsgroupeu/ansible-role-haproxy-keepalived)
-![GitHub Watchers](https://img.shields.io/github/watchers/devopsgroupeu/ansible-role-haproxy-keepalived)
 ![GitHub Issues](https://img.shields.io/github/issues/devopsgroupeu/ansible-role-haproxy-keepalived)
-![GitHub Last Commit](https://img.shields.io/github/last-commit/devopsgroupeu/ansible-role-haproxy-keepalived)
 
 [![LinkedIn](https://img.shields.io/badge/linkedin-%230077B5.svg?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/company/devopsgroup8/)
 ![HAproxy](https://img.shields.io/badge/HAproxy-24A1C1?logo=haproxy&logoColor=fff&style=for-the-badge)
