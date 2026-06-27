@@ -30,7 +30,7 @@
           - fip_env.stat.mode == '0600'
           - fip_unit.stat.exists
         fail_msg: "Cloud FIP convergence (env file / jq / retries / unit) failed"
-        success_msg: "Cloud FIP converged on RKE2 env-file model"
+        success_msg: "Cloud FIP converged on env-file model"
 
     - name: Stat cloud FIP log file
       ansible.builtin.stat:

@@ -21,15 +21,15 @@ roles:
     scm: git
 ```
 
-This role is typically used together with [`devopsgroupeu.rke2`](https://github.com/devopsgroupeu/ansible-role-rke2):
-the floating VIP defined in `keepalived_vrrp_instances[].virtual_ipaddress` becomes the
-address RKE2 agents and external clients use to reach the control-plane (the RKE2 server URL).
+The floating VIP defined in `keepalived_vrrp_instances[].virtual_ipaddress` becomes the
+stable address that clients use to reach whatever backend HAProxy fronts — for example a
+Kubernetes API endpoint, your application servers, or any TCP/HTTP service.
 
 ## Kubernetes / Container Platform Integration
 
 ### Kubernetes API Load Balancing
 
-Hosts in the `server_nodes` inventory group are the RKE2 control-plane nodes.
+Hosts in the `server_nodes` inventory group are the Kubernetes control-plane nodes.
 
 ```yaml
 haproxy_frontends:
