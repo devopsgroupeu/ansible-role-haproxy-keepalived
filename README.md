@@ -1,6 +1,6 @@
 # Ansible Role - HAProxy + Keepalived
 
-[![Ansible Galaxy](https://img.shields.io/badge/Ansible%20Galaxy-devopsgroupeu.haproxy__keepalived-blue?logo=ansible)](https://galaxy.ansible.com/ui/standalone/roles/devopsgroupeu/haproxy_keepalived/)
+[![Ansible Galaxy](https://img.shields.io/badge/Ansible%20Galaxy-devopsgroupeu.haproxy--keepalived-blue?logo=ansible)](https://galaxy.ansible.com/ui/standalone/roles/devopsgroupeu/haproxy-keepalived/)
 ![GitHub License](https://img.shields.io/github/license/devopsgroupeu/ansible-role-haproxy-keepalived)
 ![GitHub Forks](https://img.shields.io/github/forks/devopsgroupeu/ansible-role-haproxy-keepalived)
 ![GitHub Stars](https://img.shields.io/github/stars/devopsgroupeu/ansible-role-haproxy-keepalived)
@@ -61,7 +61,7 @@ package mode the version follows the distribution / configured repo.
 Install the role from Ansible Galaxy:
 
 ```bash
-ansible-galaxy role install devopsgroupeu.haproxy_keepalived
+ansible-galaxy role install devopsgroupeu.haproxy-keepalived
 ```
 
 Or pin a version via `requirements.yml` (git source):
@@ -69,7 +69,7 @@ Or pin a version via `requirements.yml` (git source):
 ```yaml
 ---
 roles:
-  - name: devopsgroupeu.haproxy_keepalived
+  - name: devopsgroupeu.haproxy-keepalived
     src: https://github.com/devopsgroupeu/ansible-role-haproxy-keepalived
     version: "v1.0.0"
     scm: git
@@ -79,7 +79,7 @@ roles:
 ansible-galaxy install -r requirements.yml
 ```
 
-Then reference it as `devopsgroupeu.haproxy_keepalived` in your play (see [Quick Start](#quick-start)).
+Then reference it as `devopsgroupeu.haproxy-keepalived` in your play (see [Quick Start](#quick-start)).
 
 ---
 
@@ -142,7 +142,7 @@ all:
         options:
           - check
   roles:
-    - role: devopsgroupeu.haproxy_keepalived
+    - role: devopsgroupeu.haproxy-keepalived
 ```
 
 ### 3. Run

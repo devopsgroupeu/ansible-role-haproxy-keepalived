@@ -32,6 +32,6 @@ air-gapped support.
 
 ## Links
 
-- [Ansible Galaxy](https://galaxy.ansible.com/ui/standalone/roles/devopsgroupeu/haproxy_keepalived/)
+- [Ansible Galaxy](https://galaxy.ansible.com/ui/standalone/roles/devopsgroupeu/haproxy-keepalived/)
 - [GitHub Repository](https://github.com/devopsgroupeu/ansible-role-haproxy-keepalived)
 - [Issues](https://github.com/devopsgroupeu/ansible-role-haproxy-keepalived/issues)

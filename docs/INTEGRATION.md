@@ -7,7 +7,7 @@ Guide for integrating HAProxy + Keepalived with various systems and cloud provid
 Install from Ansible Galaxy:
 
 ```bash
-ansible-galaxy role install devopsgroupeu.haproxy_keepalived
+ansible-galaxy role install devopsgroupeu.haproxy-keepalived
 ```
 
 Or pin a version via `requirements.yml`:
@@ -15,7 +15,7 @@ Or pin a version via `requirements.yml`:
 ```yaml
 ---
 roles:
-  - name: devopsgroupeu.haproxy_keepalived
+  - name: devopsgroupeu.haproxy-keepalived
     src: https://github.com/devopsgroupeu/ansible-role-haproxy-keepalived
     version: "v1.0.0"
     scm: git
