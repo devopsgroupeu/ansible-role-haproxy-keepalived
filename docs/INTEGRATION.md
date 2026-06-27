@@ -87,29 +87,30 @@ haproxy_backends:
 
 ## Cloud Provider Integration
 
-### Hetzner Cloud
+The floating-IP failover feature reassigns a provider-managed floating IP to the
+active master via the cloud API. The bundled notify script targets the Hetzner
+Cloud v1 API; the configuration and wiring are otherwise provider-neutral.
 
 **Configuration:**
 ```yaml
 cloud_floating_ip_enabled: true
-cloud_api_endpoint: "https://api.hetzner.cloud/v1"
+cloud_api_endpoint: "https://api.hetzner.cloud/v1"   # the bundled script's default
 cloud_api_token: "{{ vault_cloud_api_token }}"
-cloud_floating_ip_address: "95.217.27.127"
+cloud_floating_ip_address: "203.0.113.10"
 cloud_server_name: "{{ inventory_hostname }}"
 ```
 
 **Requirements:**
-- Hetzner Cloud account
-- API token with Read & Write permissions
-- Floating IP created
-- Servers in same private network
+- An account and API token (Read & Write) with the cloud provider
+- A floating IP already created
+- Servers in the same private network
 
 ### Other cloud providers
 
-The built-in floating-IP notify script targets the Hetzner Cloud API only.
-For other providers (DigitalOcean, AWS Elastic IP, etc.) you must supply your
-own notify script — set `cloud_floating_ip_enabled: false` and call your
-custom script from a Keepalived `notify` stanza instead.
+The bundled notify script speaks the Hetzner Cloud API. For other providers
+(DigitalOcean, AWS Elastic IP, etc.) supply your own notify script — set
+`cloud_floating_ip_enabled: false` and call your custom script from a Keepalived
+`notify` stanza instead.
 
 ## Database Load Balancing
 
