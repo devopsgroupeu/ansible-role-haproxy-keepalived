@@ -43,7 +43,11 @@
     validate: "{{ haproxy_binary }} -f %s -c"
     backup: true
   notify:
-    - Reload haproxy
+    # Restart (not reload) on config change: the package auto-starts HAProxy on
+    # the default config, and a soft reload over that process can leave the new
+    # frontends unbound (no listening sockets). Only fires when the config
+    # changes, so it stays idempotent.
+    - Restart haproxy
     - Cleanup haproxy config backups
 
 - name: Configure the rsyslog configuration file to accept UDP syslog reception

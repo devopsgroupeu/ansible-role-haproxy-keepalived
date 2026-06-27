@@ -1,4 +1,7 @@
 {{ ansible_managed | comment }}
 [Service]
 ExecStart=
-ExecStart={{ keepalived_binary | default('/usr/sbin/keepalived') }} -S {{ keepalived_log_facility }} -f {{ keepalived_config_dir }}/keepalived.conf -D
+# --dont-fork is required: the packaged unit is Type=notify, so keepalived must
+# stay in the foreground for sd_notify to come from the main PID. Without it,
+# systemd rejects the readiness notification and the service fails to start.
+ExecStart={{ keepalived_binary | default('/usr/sbin/keepalived') }} --dont-fork -S {{ keepalived_log_facility }} -f {{ keepalived_config_dir }}/keepalived.conf -D

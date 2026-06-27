@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- Cloud Floating IP integration now runs **before** Keepalived starts, so the
+  notify script it deploys exists when Keepalived first reads its config. Under
+  `enable_script_security`, the previous order made Keepalived refuse to start.
+- The Keepalived log-facility systemd drop-in keeps `--dont-fork`. Without it the
+  packaged `Type=notify` unit forks, the readiness notification comes from a
+  child PID, and systemd fails the service start.
+- HAProxy is now **restarted** (not soft-reloaded) on a config change. A soft
+  reload over the package's default auto-started process could leave the new
+  frontends unbound (no listening sockets).
+
+### Changed
+- Documentation is provider-agnostic. The role runs on any VMs; the floating-IP
+  failover feature notes that its bundled notify script targets the Hetzner Cloud
+  API (swap the script for other providers), and provider names otherwise appear
+  only as illustrative caveats.
+
 ## [1.0.0] - 2026-06-23
 
 Initial public release on the devopsgroupeu Ansible Galaxy namespace. Installs and
