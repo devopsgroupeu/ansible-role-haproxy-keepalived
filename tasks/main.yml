@@ -12,11 +12,9 @@
   when: haproxy_enabled | bool
   tags: haproxy
 
-- name: Install and start Keepalived
-  ansible.builtin.import_tasks: keepalived.yml
-  when: keepalived_enabled | bool
-  tags: keepalived
-
+# Must run BEFORE keepalived starts: this deploys the notify script that
+# keepalived.conf references. With enable_script_security, keepalived refuses to
+# start if that script is not yet on disk.
 - name: Configure cloud Floating IP API integration
   ansible.builtin.import_tasks: cloud_floating_ip.yml
   when:
@@ -24,3 +22,8 @@
   tags:
     - keepalived
     - cloud
+
+- name: Install and start Keepalived
+  ansible.builtin.import_tasks: keepalived.yml
+  when: keepalived_enabled | bool
+  tags: keepalived
