@@ -34,21 +34,22 @@
   become: true
   gather_facts: false
   tasks:
-    # The packaged keepalived uses Type=notify which fails in Docker containers
-    # because child processes cannot send sd_notify. Override to Type=forking
-    # so the service starts cleanly in the molecule container environment.
+    # The packaged keepalived runs Type=notify with --dont-fork. In a Docker
+    # container, override to Type=simple so systemd does not wait on a fork that
+    # never happens (keepalived stays in the foreground) and the service starts
+    # cleanly in the molecule container environment.
     - name: Create keepalived systemd drop-in directory
       ansible.builtin.file:
         path: /etc/systemd/system/keepalived.service.d
         state: directory
         mode: "0755"
 
-    - name: Override keepalived service type to forking for Docker
+    - name: Override keepalived service type to simple for Docker
       ansible.builtin.copy:
         dest: /etc/systemd/system/keepalived.service.d/docker-compat.conf
         content: |
           [Service]
-          Type=forking
+          Type=simple
         mode: "0644"
 
     - name: Reload systemd daemon

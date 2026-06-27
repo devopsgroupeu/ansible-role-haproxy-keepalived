@@ -55,12 +55,12 @@
         state: directory
         mode: "0755"
 
-    - name: Override keepalived service type to forking for Docker (prepare)
+    - name: Override keepalived service type to simple for Docker (prepare)
       ansible.builtin.copy:
         dest: /etc/systemd/system/keepalived.service.d/docker-compat.conf
         content: |
           [Service]
-          Type=forking
+          Type=simple
         mode: "0644"
 
     - name: Reload systemd daemon (prepare)
