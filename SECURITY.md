@@ -152,7 +152,7 @@ We will announce security updates through:
 
 1. GitHub Security Advisories
 2. Git tags with security notes
-3. CHANGELOG.md with `[SECURITY]` prefix
+3. GitHub Release notes with a `[SECURITY]` prefix
 
 Subscribe to repository notifications to stay informed.
 
