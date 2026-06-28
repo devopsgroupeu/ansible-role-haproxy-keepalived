@@ -7,6 +7,9 @@
       - openssl-devel
       - libnl3-devel
       - net-snmp-devel
+      # Required so configure compiles sd_notify support; the generated
+      # Type=notify systemd unit times out at start without it.
+      - systemd-devel
     state: present
   when: ansible_facts['os_family'] == 'RedHat'
 
@@ -19,6 +22,9 @@
       - libnl-3-dev
       - libnl-genl-3-dev
       - libsnmp-dev
+      # Required so configure compiles sd_notify support; the generated
+      # Type=notify systemd unit times out at start without it.
+      - libsystemd-dev
     state: present
   when: ansible_facts['os_family'] == 'Debian'
 
@@ -41,7 +47,9 @@
 
 - name: Determine if Keepalived installation is required
   ansible.builtin.set_fact:
-    keepalived_installation_required: "{{ installed_keepalived_version | default('') is version(keepalived_version, '!=') }}"
+    keepalived_installation_required: >-
+      {{ (installed_keepalived_version | default('') | length == 0)
+         or (installed_keepalived_version is version(keepalived_version, '!=')) }}
 
 - name: Install Keepalived from source if required
   when: keepalived_installation_required

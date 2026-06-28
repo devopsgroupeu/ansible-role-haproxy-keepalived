@@ -42,6 +42,7 @@
     mode: "0644"
     validate: "{{ haproxy_binary }} -f %s -c"
     backup: true
+  no_log: true  # config renders the stats password; suppress --diff/-v leakage
   notify:
     # Restart (not reload) on config change: the package auto-starts HAProxy on
     # the default config, and a soft reload over that process can leave the new
@@ -70,6 +71,9 @@
     name: haproxy
     state: started
     enabled: true
+    # Source mode deploys a generated unit whose daemon-reload is a deferred
+    # handler; reload here so systemd has registered it before this start.
+    daemon_reload: true
 
 - name: Wait for HAProxy to be ready
   ansible.builtin.wait_for:

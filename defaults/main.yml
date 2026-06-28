@@ -36,12 +36,13 @@ haproxy_enabled: true
 # for package selection but used to label the downloaded tarball in source mode.
 # LTS policy: even-numbered branches only (3.0/3.2/3.4...).
 # Check available versions: https://www.haproxy.org/download/
-haproxy_version: "3.4.0"
+haproxy_version: "3.4.1"
 
 # SHA256 checksum for the HAProxy source tarball (REQUIRED in source mode).
 # Either a literal "sha256:<hex>" or a remote ".sha256" URL. haproxy.org
-# publishes a <tarball>.sha256 sidecar next to each release.
-haproxy_src_sha256: ""
+# publishes a <tarball>.sha256 sidecar next to each release. The default below
+# matches haproxy_version; override both together when changing the version.
+haproxy_src_sha256: "sha256:2e62c4ce4fd77d3bc7cf17e586431663454456a078b7c8465b8f0125b5bc22f8"
 
 # Install method: 'package' (default, distro/repo-driven) or 'source' (compile).
 haproxy_install_method: package
@@ -338,10 +339,11 @@ keepalived_enabled: true
 # Keepalived version to target. In source mode this is the exact tarball version.
 # In package mode apt/dnf owns the version; this var is informational only.
 # Check available versions: https://www.keepalived.org/download.html
-keepalived_version: "2.3.4"
+keepalived_version: "2.4.1"
 
 # SHA256 checksum for the Keepalived source tarball (REQUIRED in source mode).
-keepalived_src_sha256: ""
+# Matches keepalived_version; override both together when changing the version.
+keepalived_src_sha256: "sha256:5afe09d3730152b96cea66c97ea8cc5ee172a4c237e79804503efa8d5b0f8ba1"
 
 # Install method: 'package' (default) or 'source' (compile).
 keepalived_install_method: package

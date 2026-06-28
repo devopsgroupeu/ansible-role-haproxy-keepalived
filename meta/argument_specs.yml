@@ -26,7 +26,7 @@ argument_specs:
       haproxy_version:
         type: str
         required: false
-        default: "3.4.0"
+        default: "3.4.1"
         description: HAProxy source version (used only when haproxy_install_method=source).
       haproxy_install_method:
         type: str
@@ -81,7 +81,7 @@ argument_specs:
       haproxy_src_sha256:
         type: str
         required: false
-        default: ""
+        default: "sha256:2e62c4ce4fd77d3bc7cf17e586431663454456a078b7c8465b8f0125b5bc22f8"
         description: >
           SHA256 checksum for the HAProxy source tarball; required when
           haproxy_install_method=source. Accepts "sha256:<hex>" or a remote
@@ -348,12 +348,12 @@ argument_specs:
       keepalived_version:
         type: str
         required: false
-        default: "2.3.4"
+        default: "2.4.1"
         description: Keepalived source version (used only when keepalived_install_method=source).
       keepalived_src_sha256:
         type: str
         required: false
-        default: ""
+        default: "sha256:5afe09d3730152b96cea66c97ea8cc5ee172a4c237e79804503efa8d5b0f8ba1"
         description: >
           SHA256 checksum for the Keepalived source tarball; required when
           keepalived_install_method=source. Accepts "sha256:<hex>" or a remote

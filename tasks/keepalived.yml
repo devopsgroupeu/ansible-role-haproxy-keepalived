@@ -10,6 +10,7 @@
     dest: "{{ keepalived_config_dir }}/keepalived.conf"
     mode: "0644"
     backup: true
+  no_log: true  # config renders the VRRP auth_pass; suppress --diff/-v leakage
   notify:
     - Cleanup keepalived config backups
     - Reload keepalived
