@@ -47,10 +47,10 @@ Ansible role that installs and configures **HAProxy** and **Keepalived** for hig
 - `ansible.posix` collection >= 1.5.0 (`ansible-galaxy collection install -r requirements.yml`)
 - `become: true` (root access required)
 - Two proxy nodes for HA (one master, one backup)
-- Supported OS: Ubuntu 22.04 / 24.04, Debian 12, Rocky Linux 9, Oracle Linux 9, RHEL 9
+- Supported OS: Ubuntu 24.04 (Noble), Debian 12 (Bookworm) and 13 (Trixie); RHEL / Rocky Linux / Oracle Linux 9 (EL9, verified on real hosts)
 
 **Version policy:** in source mode the role tracks HAProxy **LTS** branches
-(even-numbered: 3.0/3.2/3.4). The default is the newest LTS (`3.4.0`). In
+(even-numbered: 3.0/3.2/3.4). The default is the newest LTS (`3.4.1`). In
 package mode the version follows the distribution / configured repo.
 
 ---

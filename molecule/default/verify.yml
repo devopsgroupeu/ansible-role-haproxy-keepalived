@@ -301,7 +301,7 @@
 
     - name: Assert Reload handlers are defined in the role
       ansible.builtin.command: >-
-        grep -q "Reload haproxy" {{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/handlers/main.yml
+        grep -q "Reload keepalived" {{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/handlers/main.yml
       delegate_to: localhost
       become: false
       run_once: true

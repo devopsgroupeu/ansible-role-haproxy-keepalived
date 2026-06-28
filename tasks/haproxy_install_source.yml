@@ -45,7 +45,9 @@
 
 - name: Determine if HAProxy installation is required
   ansible.builtin.set_fact:
-    haproxy_installation_required: "{{ installed_haproxy_version | default('') is version(haproxy_version, '!=') }}"
+    haproxy_installation_required: >-
+      {{ (installed_haproxy_version | default('') | length == 0)
+         or (installed_haproxy_version is version(haproxy_version, '!=')) }}
 
 - name: Install HAProxy from source if required
   when: haproxy_installation_required
@@ -100,18 +102,17 @@
       register: haproxy_compile
       changed_when: haproxy_compile.rc == 0
 
-    # Run make install only when the compile step actually ran (i.e. the binary
-    # was not already present).  The compile task's `creates:` skips it when
-    # haproxy-{{ haproxy_version }}/haproxy exists, so haproxy_compile will not
-    # be `changed` in that case, and this task is skipped as well.
-    - name: Install HAProxy binaries  # noqa: no-handler
+    # Always run make install when an install/upgrade is required (the enclosing
+    # block only runs when the installed version differs). This self-heals a
+    # prior run that compiled but failed before installing: the compile step is
+    # then skipped via `creates:`, yet install still runs to completion.
+    - name: Install HAProxy binaries
       ansible.builtin.command:
         cmd: make install
       args:
         chdir: "{{ haproxy_install_dir }}/haproxy-{{ haproxy_version }}"
       register: haproxy_install
       changed_when: haproxy_install.rc == 0
-      when: haproxy_compile is changed
 
     - name: Generate systemd service HAProxy file
       ansible.builtin.command:
@@ -139,3 +140,14 @@
   when:
     - haproxy_remove_build_deps | bool
     - haproxy_compile is defined and haproxy_compile is changed
+
+# The source-built systemd unit starts HAProxy with `-f $CONFIG -f $CFGDIR`
+# (CFGDIR=/etc/haproxy/conf.d). HAProxy refuses to start if that directory is
+# missing, so ensure it exists for source installs (distro packages ship it).
+- name: Ensure HAProxy conf.d directory exists (required by the source-built unit)
+  ansible.builtin.file:
+    path: "{{ haproxy_config_dir }}/conf.d"
+    state: directory
+    owner: root
+    group: "{{ haproxy_group }}"
+    mode: "0750"

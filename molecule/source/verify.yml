@@ -1,0 +1,60 @@
+---
+- name: Verify source-mode install
+  hosts: proxy_hosts
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Get HAProxy version from the source-built binary
+      ansible.builtin.command: /usr/local/sbin/haproxy -v
+      register: hap_v
+      changed_when: false
+      failed_when: hap_v.rc != 0
+
+    - name: Assert HAProxy was compiled to the pinned version
+      ansible.builtin.assert:
+        that:
+          - "'3.4.1' in hap_v.stdout"
+        fail_msg: "Source-built HAProxy is not version 3.4.1: {{ hap_v.stdout }}"
+        success_msg: "HAProxy 3.4.1 compiled and installed from source"
+
+    - name: Get Keepalived version from the source-built binary
+      ansible.builtin.command: /usr/local/sbin/keepalived --version
+      register: ka_v
+      changed_when: false
+      failed_when: ka_v.rc != 0
+
+    - name: Assert Keepalived was compiled to the pinned version
+      ansible.builtin.assert:
+        that:
+          - "'2.4.1' in (ka_v.stderr ~ ka_v.stdout)"
+        fail_msg: "Source-built Keepalived is not version 2.4.1: {{ ka_v.stderr }}"
+        success_msg: "Keepalived 2.4.1 compiled and installed from source"
+
+    - name: Gather service facts
+      ansible.builtin.service_facts:
+
+    - name: Assert haproxy and keepalived services are active
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.services['haproxy.service'].state == 'running'
+          - ansible_facts.services['keepalived.service'].state == 'running'
+        fail_msg: "Source-mode services not running"
+        success_msg: "Source-mode HAProxy + Keepalived running"
+
+    - name: Validate the rendered HAProxy configuration with the source binary
+      ansible.builtin.command: /usr/local/sbin/haproxy -c -f /etc/haproxy/haproxy.cfg
+      changed_when: false
+      register: hap_syntax
+      failed_when: hap_syntax.rc != 0
+
+    - name: Stat the source-built HAProxy systemd unit
+      ansible.builtin.stat:
+        path: /etc/systemd/system/haproxy.service
+      register: hap_unit
+
+    - name: Assert source-built HAProxy unit was deployed under /etc/systemd/system
+      ansible.builtin.assert:
+        that:
+          - hap_unit.stat.exists
+        fail_msg: "Source-built HAProxy systemd unit missing (source install did not deploy it)"
+        success_msg: "Source-built HAProxy systemd unit present"

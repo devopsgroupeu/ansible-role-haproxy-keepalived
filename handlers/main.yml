@@ -1,4 +1,11 @@
 ---
+# Reload systemd is defined before the restart handlers so that when a single
+# task notifies both (e.g. a unit drop-in change), the daemon-reload runs first
+# and the service restarts against the refreshed unit definition.
+- name: Reload systemd
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+
 - name: Restart keepalived
   ansible.builtin.systemd_service:
     name: keepalived
@@ -9,11 +16,6 @@
   ansible.builtin.systemd_service:
     name: haproxy
     state: restarted
-
-- name: Reload haproxy
-  ansible.builtin.systemd_service:
-    name: haproxy
-    state: reloaded
 
 - name: Reload keepalived
   ansible.builtin.systemd_service:
@@ -26,10 +28,6 @@
     name: rsyslog
     state: restarted
     enabled: true
-
-- name: Reload systemd
-  ansible.builtin.systemd_service:
-    daemon_reload: true
 
 - name: Reload systemd and enable floating IP service
   ansible.builtin.systemd_service:
