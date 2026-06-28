@@ -2,7 +2,7 @@
 galaxy_info:
   author: DevOpsGroup
   company: DevOpsGroup s.r.o
-  description: |
+  description: >
     Production-ready Ansible role for installing and configuring HAProxy with Keepalived
     in high-availability mode. Supports package install (default) or source compilation,
     internet-connected or air-gapped environments.
@@ -40,6 +40,3 @@ galaxy_info:
         - "9"
 
 dependencies: []
-
-collections:
-  - ansible.posix

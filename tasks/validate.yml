@@ -42,7 +42,7 @@
         - haproxy_config is not defined or haproxy_config | length == 0
       ansible.builtin.assert:
         that:
-          - haproxy_frontends is defined or haproxy_backends is defined or haproxy_listens is defined
+          - (haproxy_frontends | length > 0) or (haproxy_backends | length > 0) or (haproxy_listens | length > 0)
         fail_msg: |
           When haproxy_config is not set, you must define at least one of:
             - haproxy_frontends

@@ -1,0 +1,91 @@
+---
+dependency:
+  name: galaxy
+driver:
+  name: docker
+platforms:
+  # Master node - source-mode test (compiles HAProxy + Keepalived from source).
+  # privileged: true required for systemd + keepalived VRRP VIP management
+  # (CAP_NET_ADMIN needed to bind/unbind the VIP on the interface).
+  - name: src-master
+    image: geerlingguy/docker-${MOLECULE_DISTRO:-debian12}-ansible:latest
+    command: ""
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cgroupns_mode: host
+    privileged: true
+    pre_build_image: true
+    networks:
+      # Isolated per-scenario network; VIP 172.18.0.230 on the default bridge /16.
+      - name: molecule-source-net
+    groups:
+      - proxy_hosts
+
+  # Backup node
+  - name: src-backup
+    image: geerlingguy/docker-${MOLECULE_DISTRO:-debian12}-ansible:latest
+    command: ""
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cgroupns_mode: host
+    privileged: true
+    pre_build_image: true
+    networks:
+      - name: molecule-source-net
+    groups:
+      - proxy_hosts
+
+provisioner:
+  name: ansible
+  config_options:
+    defaults:
+      interpreter_python: auto_silent
+    ssh_connection:
+      pipelining: false
+  inventory:
+    group_vars:
+      all:
+        haproxy_loadbalancer_master: "src-master"
+        haproxy_loadbalancer_backup: "src-backup"
+        haproxy_install_method: source
+        keepalived_install_method: source
+        # Pin the compiled versions + verified upstream checksums so the build is
+        # reproducible and the source download is integrity-checked.
+        haproxy_version: "3.4.1"
+        haproxy_src_sha256: "sha256:2e62c4ce4fd77d3bc7cf17e586431663454456a078b7c8465b8f0125b5bc22f8"
+        keepalived_version: "2.4.1"
+        keepalived_src_sha256: "sha256:5afe09d3730152b96cea66c97ea8cc5ee172a4c237e79804503efa8d5b0f8ba1"
+        haproxy_stats_page_pass: "test_password_123456"
+        keepalived_network_interface: eth0
+        keepalived_vrrp_instances:
+          - vrrp_instance_name: VI_SRC
+            virtual_ipaddress: "172.18.0.230"
+            virtual_router_id: 90
+        haproxy_frontends:
+          - name: fe
+            address: "*"
+            port: 8080
+            default_backend: be
+            mode: http
+        haproxy_backends:
+          - name: be
+            mode: http
+            servers:
+              - name: app1
+                address: 127.0.0.1
+                port: 9
+
+verifier:
+  name: ansible
+
+scenario:
+  test_sequence:
+    - dependency
+    - destroy
+    - syntax
+    - create
+    - prepare
+    - converge
+    - idempotence
+    - verify
+    - destroy

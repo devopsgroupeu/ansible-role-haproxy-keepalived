@@ -1,0 +1,16 @@
+---
+- name: Prepare source-mode test environment
+  hosts: all
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Install iproute2 (Debian/Ubuntu)
+      ansible.builtin.package:
+        name: iproute2
+        state: present
+      when: ansible_os_family == 'Debian'
+
+    - name: Ensure systemd-journald is running
+      ansible.builtin.service:
+        name: systemd-journald
+        state: started
