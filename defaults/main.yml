@@ -433,6 +433,9 @@ keepalived_sync_groups: []
 #     Higher priority becomes master. Auto-assignment: master=100, backup=90
 #   - state: Initial state MASTER or BACKUP (optional, default: auto-assigned)
 #     Usually auto-assigned based on haproxy_loadbalancer_master/haproxy_loadbalancer_backup
+#   - advert_int, vrrp_version, preempt_delay, garp_master_delay,
+#     garp_master_refresh, auth_pass: per-instance overrides of the matching
+#     keepalived_* defaults (optional)
 #
 # VRRP Instance Configuration:
 #   - Uses unicast communication (cloud-friendly, no multicast)

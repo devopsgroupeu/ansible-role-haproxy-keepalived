@@ -242,6 +242,19 @@
         fail_msg: "Sync group / nopreempt / tunables not rendered, or MASTER state forced under nopreempt"
         success_msg: "VRRP sync group + flap-control tunables rendered"
 
+    - name: Verify the per-instance advert_int override applies to its instance only
+      vars:
+        hkv_ka_text: "{{ ka_cfg.content | b64decode }}"
+        hkv_vi_test: "{{ hkv_ka_text.split('vrrp_instance VI_TEST {')[1].split('vrrp_instance ')[0] }}"
+        hkv_vi_test2: "{{ hkv_ka_text.split('vrrp_instance VI_TEST2 {')[1].split('vrrp_instance ')[0] }}"
+      ansible.builtin.assert:
+        that:
+          - "'advert_int 3' in hkv_vi_test2"
+          - "'advert_int 2' in hkv_vi_test"
+          - "'advert_int 3' not in hkv_vi_test"
+        fail_msg: "Per-instance advert_int override not rendered (or leaked to another instance)"
+        success_msg: "Per-instance advert_int override rendered for VI_TEST2 only"
+
     # ========================================================================
     # HAP-27: Configurable peer group rendered
     # ========================================================================

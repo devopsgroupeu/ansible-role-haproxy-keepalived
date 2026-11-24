@@ -286,6 +286,12 @@ keepalived_vrrp_instances:
     virtual_router_id: 51            # Required — 1-255, unique on the subnet
     priority: 100                    # Optional — auto-assigned from master/backup
     state: MASTER                    # Optional — auto-assigned from master/backup
+    advert_int: 1                    # Optional - overrides keepalived_advert_int
+    vrrp_version: 2                  # Optional - overrides keepalived_vrrp_version
+    preempt_delay: 0                 # Optional - overrides keepalived_preempt_delay
+    garp_master_delay: 0             # Optional - overrides keepalived_garp_master_delay
+    garp_master_refresh: 0           # Optional - overrides keepalived_garp_master_refresh
+    auth_pass: "{{ vault_vi1_pass }}"  # Optional - overrides keepalived_auth_pass (1-8 chars)
 ```
 
 Multiple VIPs:
