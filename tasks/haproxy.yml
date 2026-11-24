@@ -43,12 +43,12 @@
     validate: "{{ haproxy_binary }} -f %s -c"
     backup: true
   no_log: true  # config renders the stats password; suppress --diff/-v leakage
+  register: haproxy_config_result
+  # The config change is applied in-play by "Apply HAProxy configuration
+  # change" below, not by a deferred handler: the readiness checks that follow
+  # must run against the new config, and a handler lost to a failed check would
+  # never fire again on rerun.
   notify:
-    # Restart (not reload) on config change: the package auto-starts HAProxy on
-    # the default config, and a soft reload over that process can leave the new
-    # frontends unbound (no listening sockets). Only fires when the config
-    # changes, so it stays idempotent.
-    - Restart haproxy
     - Cleanup haproxy config backups
 
 - name: Configure the rsyslog configuration file to accept UDP syslog reception
@@ -74,6 +74,20 @@
     # Source mode deploys a generated unit whose daemon-reload is a deferred
     # handler; reload here so systemd has registered it before this start.
     daemon_reload: true
+  register: haproxy_service_start
+
+# Restart (not reload) on config change: the package auto-starts HAProxy on
+# the default config, and a soft reload over that process can leave the new
+# frontends unbound (no listening sockets). Skipped when the task above just
+# started the service, because it already runs the new config and binary.
+- name: Apply HAProxy configuration change
+  ansible.builtin.systemd_service:
+    name: haproxy
+    state: restarted
+    daemon_reload: true
+  when:
+    - haproxy_config_result is changed or haproxy_source_changed | default(false) | bool
+    - haproxy_service_start is not changed
 
 - name: Wait for HAProxy to be ready
   ansible.builtin.wait_for:

@@ -73,8 +73,6 @@
         dest: "{{ haproxy_install_dir }}/{{ haproxy_src_filename }}"
         mode: "0644"
       when: haproxy_offline_install | bool
-      notify:
-        - Restart haproxy
 
     - name: Download HAProxy source on the target (online)
       ansible.builtin.get_url:
@@ -83,8 +81,6 @@
         mode: "0644"
         checksum: "{{ haproxy_src_sha256 }}"
       when: not (haproxy_offline_install | bool)
-      notify:
-        - Restart haproxy
 
     - name: Extract HAProxy source
       ansible.builtin.unarchive:
@@ -113,6 +109,12 @@
         chdir: "{{ haproxy_install_dir }}/haproxy-{{ haproxy_version }}"
       register: haproxy_install
       changed_when: haproxy_install.rc == 0
+
+    # Consumed by "Apply HAProxy configuration change" in haproxy.yml so a
+    # running HAProxy is restarted onto the new binary in the same play.
+    - name: Flag HAProxy binary change for restart
+      ansible.builtin.set_fact:
+        haproxy_source_changed: "{{ haproxy_install is changed }}"
 
     - name: Generate systemd service HAProxy file
       ansible.builtin.command:

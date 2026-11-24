@@ -1,0 +1,54 @@
+---
+# ============================================================================
+# Molecule Side Effect Playbook
+# ============================================================================
+# Re-converges the role with changed settings and checks that each change is
+# live at the end of the play (no deferred handler), then restores the fixture
+# so verify.yml runs against the documented group_vars.
+# ============================================================================
+
+- name: Re-converge with changed settings
+  hosts: proxy_hosts
+  become: true
+  gather_facts: true
+  vars:
+    hkv_rotated_stats_pass: "rotated_password_654321"
+  tasks:
+    - name: Re-apply the role with a rotated stats password
+      ansible.builtin.include_role:
+        name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}"
+      vars:
+        haproxy_stats_page_pass: "{{ hkv_rotated_stats_pass }}"
+
+    - name: Stats page accepts the rotated password
+      ansible.builtin.uri:
+        url: http://127.0.0.1:1936/haproxy/stats
+        user: admin
+        password: "{{ hkv_rotated_stats_pass }}"
+        force_basic_auth: true
+        status_code: 200
+
+    - name: Stats page rejects the previous password
+      ansible.builtin.uri:
+        url: http://127.0.0.1:1936/haproxy/stats
+        user: admin
+        password: "{{ haproxy_stats_page_pass }}"
+        force_basic_auth: true
+        status_code: 401
+
+- name: Restore the fixture configuration
+  hosts: proxy_hosts
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Re-apply the role with the fixture group_vars
+      ansible.builtin.include_role:
+        name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}"
+
+    - name: Stats page accepts the fixture password again
+      ansible.builtin.uri:
+        url: http://127.0.0.1:1936/haproxy/stats
+        user: admin
+        password: "{{ haproxy_stats_page_pass }}"
+        force_basic_auth: true
+        status_code: 200
