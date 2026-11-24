@@ -186,7 +186,8 @@ haproxy_backends:
     balance: roundrobin          # Optional — load balancing algorithm
     httpcheck: true              # Optional — enable HTTP health checks
     httpcheck_method: GET        # Optional — health check HTTP method
-    http_check:                  # Optional — advanced health check
+    httpcheck_uri: /health       # Optional - health check URI (default /)
+    http_check:                  # Optional - advanced health check; enables option httpchk, overrides the two above
       send:
         method: GET
         uri: /health

@@ -107,15 +107,14 @@ frontend {{ frontend.name }}
 
 {% for backend in haproxy_backends %}
 backend {{ backend.name }}
-{% if backend.httpcheck is defined and backend.httpcheck_method is defined and backend.httpcheck %}
-    option httpchk {% if backend.httpcheck_method is defined %}{{ backend.httpcheck_method }}{% endif %}
-{% elif backend.httpcheck is defined and backend.httpcheck %}
+{% if backend.httpcheck | default(false) | bool or backend.http_check is defined %}
     option httpchk
-{% endif %}
-
 {% if backend.http_check is defined %}
     http-check send meth {{ backend.http_check.send.method }} uri {{ backend.http_check.send.uri }}
     http-check expect {{ backend.http_check.expect }}
+{% elif backend.httpcheck_method is defined or backend.httpcheck_uri is defined %}
+    http-check send meth {{ backend.httpcheck_method | default('OPTIONS') }} uri {{ backend.httpcheck_uri | default('/') }}
+{% endif %}
 {% endif %}
     balance {{ backend.balance | default(haproxy_backend_default_balance) }}
     mode {{ backend.mode | default('http') }}
@@ -152,10 +151,15 @@ backend {{ backend.name }}
 listen {{ listen.name }}
     bind {{ listen.address }}:{{ listen.listen_port }}{% if listen.ssl is defined and listen.ssl == true %} ssl{% if listen.crts is defined and listen.crts | length > 0 %}{% for crt in listen.crts %} crt {{ crt }}{% endfor %}{% endif %} ssl-min-ver {{ listen.ssl_min_ver | default(haproxy_ssl_min_ver) }}{% endif %}
 
-{% if listen.httpcheck %}
-    option httpchk {% if listen.httpcheck_method is defined %}{{ listen.httpcheck_method }}{% endif %}
+{% if listen.httpcheck | default(false) | bool or listen.http_check is defined %}
+    option httpchk
+{% if listen.http_check is defined %}
+    http-check send meth {{ listen.http_check.send.method }} uri {{ listen.http_check.send.uri }}
+    http-check expect {{ listen.http_check.expect }}
+{% elif listen.httpcheck_method is defined or listen.httpcheck_uri is defined %}
+    http-check send meth {{ listen.httpcheck_method | default('OPTIONS') }} uri {{ listen.httpcheck_uri | default('/') }}
 {% endif %}
-
+{% endif %}
     balance {{ listen.balance | default(haproxy_listen_default_balance) }}
     mode {{ listen.mode | default('tcp') }}
 {% for rule in listen.http_request_rules | default([]) %}

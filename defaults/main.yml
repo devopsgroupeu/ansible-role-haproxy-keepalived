@@ -226,8 +226,11 @@ haproxy_frontends: []
 #   - balance: Load balancing algorithm (default: roundrobin)
 #     Options: roundrobin, leastconn, source, uri, etc.
 #   - httpcheck: Enable HTTP health checks (default: false)
-#   - httpcheck_method: HTTP method for health checks (GET, HEAD, OPTIONS)
-#   - http_check: Advanced HTTP health check configuration
+#   - httpcheck_method: HTTP method for health checks (GET, HEAD, OPTIONS;
+#     default OPTIONS, as in HAProxy)
+#   - httpcheck_uri: URI requested by the health check (default: /)
+#   - http_check: Advanced HTTP health check configuration; also enables
+#     "option httpchk" and takes precedence over httpcheck_method/httpcheck_uri
 #     - send: {method: GET, uri: /health}
 #     - expect: status 200
 #   - http_send_name_header: Send server name in this HTTP header

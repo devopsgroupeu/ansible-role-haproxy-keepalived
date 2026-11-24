@@ -53,6 +53,29 @@ haproxy_backends:
     port: 80
     options:
       - check
+  # http_check alone must still render "option httpchk"
+  - name: be_http_check_only
+    mode: http
+    http_check:
+      send:
+        method: GET
+        uri: /
+      expect: status 200
+    servers:
+      - backend1
+    port: 80
+    options:
+      - check
+  # httpcheck_method must become "http-check send meth", not the URI
+  - name: be_httpcheck_method
+    mode: http
+    httpcheck: true
+    httpcheck_method: GET
+    servers:
+      - backend1
+    port: 80
+    options:
+      - check
 haproxy_global_extra: |
   tune.ssl.default-dh-param 2048
 haproxy_custom_sections: |

@@ -105,6 +105,48 @@
         success_msg: "Stats hardened: loopback bind, admin off"
 
     # ========================================================================
+    # Health checks: http_check-only and httpcheck_method backends
+    # ========================================================================
+
+    - name: Verify health check directives render per backend
+      vars:
+        hkv_hap_text: "{{ hap_cfg_stats.content | b64decode }}"
+        hkv_be_check_only: "{{ hkv_hap_text.split('backend be_http_check_only')[1].split('backend ')[0] }}"
+        hkv_be_method: "{{ hkv_hap_text.split('backend be_httpcheck_method')[1].split('backend ')[0] }}"
+      ansible.builtin.assert:
+        that:
+          - "'option httpchk' in hkv_be_check_only"
+          - "'http-check send meth GET uri /' in hkv_be_check_only"
+          - "'http-check expect status 200' in hkv_be_check_only"
+          - "'option httpchk' in hkv_be_method"
+          - "'option httpchk GET' not in hkv_be_method"
+          - "'http-check send meth GET uri /' in hkv_be_method"
+        fail_msg: "Health check directives rendered incorrectly"
+        success_msg: "option httpchk and http-check send rendered for both backends"
+
+    - name: Verify HAProxy does not ignore the http-check rules
+      ansible.builtin.assert:
+        that:
+          - "'uses http-check rules without' not in haproxy_syntax_check.stderr"
+        fail_msg: "haproxy -c reports ignored http-check rules: {{ haproxy_syntax_check.stderr }}"
+        success_msg: "No http-check rules are ignored"
+
+    - name: Read backend states from the stats CSV
+      ansible.builtin.uri:
+        url: "http://localhost:1936/haproxy/stats;csv"
+        user: admin
+        password: "{{ haproxy_stats_page_pass }}"
+        force_basic_auth: true
+        return_content: true
+      register: hkv_stats_csv
+      until: >-
+        hkv_stats_csv.content is defined
+        and (hkv_stats_csv.content | regex_search('be_http_check_only,backend1,([^,]*,){15}UP') is not none)
+        and (hkv_stats_csv.content | regex_search('be_httpcheck_method,backend1,([^,]*,){15}UP') is not none)
+      retries: 10
+      delay: 2
+
+    # ========================================================================
     # HAP-24: http-server-close not in default options
     # ========================================================================
 
