@@ -75,13 +75,14 @@
       ansible.builtin.command: /usr/local/sbin/keepalived -t -f /etc/keepalived-custom/keepalived.conf
       changed_when: false
 
-    - name: Stat role-managed HAProxy directories
+    - name: Stat role-managed HAProxy directories and config
       ansible.builtin.stat:
         path: "{{ item }}"
       loop:
         - /etc/haproxy/certs
         - /var/lib/haproxy
         - /run/haproxy
+        - /etc/haproxy/haproxy.cfg
       register: hkv_hap_dirs
 
     - name: Assert the directories belong to the custom haproxy_group

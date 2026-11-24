@@ -22,7 +22,10 @@
   ansible.builtin.template:
     src: keepalived.conf.j2
     dest: "{{ keepalived_config_dir }}/keepalived.conf"
-    mode: "0644"
+    # The config holds the VRRP auth_pass; keepalived reads it as root.
+    owner: root
+    group: root
+    mode: "0640"
     validate: "{{ keepalived_binary }} -t -f %s"
     backup: true
   no_log: true  # config renders the VRRP auth_pass; suppress --diff/-v leakage

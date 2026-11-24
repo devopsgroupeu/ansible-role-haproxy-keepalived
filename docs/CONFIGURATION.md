@@ -406,6 +406,11 @@ you have specific filesystem requirements.
 | `haproxy_ssl_cert_src` | `""` | Controller dir of SSL certs to deploy into `{{ haproxy_config_dir }}/certs/`; empty = none |
 | `keepalived_config_dir` | `/etc/keepalived` | Keepalived config directory (`keepalived.conf`) |
 
+`haproxy.cfg` (`root:{{ haproxy_group }}`) and `keepalived.conf` (`root:root`)
+are written with mode `0640`, as are the config backups the role keeps, because
+they contain the stats credentials and the VRRP `auth_pass`. A non-root tool
+that reads `haproxy.cfg` must be in `haproxy_group`.
+
 ---
 
 ## Advanced Examples

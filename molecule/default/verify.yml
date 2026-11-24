@@ -459,6 +459,47 @@
         fail_msg: "Certificate directory not found"
         success_msg: "Certificate directory exists"
 
+    - name: Stat the credential-bearing configs
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - /etc/haproxy/haproxy.cfg
+        - /etc/keepalived/keepalived.conf
+      register: hkv_cred_cfgs
+
+    - name: Verify the configs are 0640 and not world-readable
+      ansible.builtin.assert:
+        that:
+          - item.stat.mode == '0640'
+          - item.stat.pw_name == 'root'
+          - item.stat.gr_name == ('haproxy' if 'haproxy' in item.item else 'root')
+        fail_msg: "{{ item.item }} is {{ item.stat.mode }} {{ item.stat.pw_name }}:{{ item.stat.gr_name }}"
+        success_msg: "{{ item.item }} is 0640"
+      loop: "{{ hkv_cred_cfgs.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Try to read haproxy.cfg as an unprivileged user
+      ansible.builtin.command: su -s /bin/sh nobody -c 'cat /etc/haproxy/haproxy.cfg'
+      register: hkv_nobody_read
+      changed_when: false
+      failed_when: hkv_nobody_read.rc == 0
+
+    - name: Find world-readable config backups
+      ansible.builtin.command: >-
+        find /etc/haproxy /etc/keepalived
+        ( -name 'haproxy.cfg.*' -o -name 'keepalived.conf.*' ! -name '*.sample' )
+        -perm /004
+      register: hkv_backup_perms
+      changed_when: false
+
+    - name: Verify no config backup is world-readable
+      ansible.builtin.assert:
+        that:
+          - hkv_backup_perms.stdout | length == 0
+        fail_msg: "World-readable config backups: {{ hkv_backup_perms.stdout_lines }}"
+        success_msg: "Config backups are not world-readable"
+
     # ========================================================================
     # Log Files
     # ========================================================================

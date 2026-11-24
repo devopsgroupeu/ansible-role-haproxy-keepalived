@@ -36,12 +36,15 @@
     enabled: true
     state: started
 
+# Backups keep the previous credentials, so the ones kept are made 0640 too
+# (backups written before the config became 0640 are still world-readable).
 - name: Cleanup haproxy config backups
   ansible.builtin.shell: |
     set -o pipefail
     find {{ haproxy_config_dir }} -name 'haproxy.cfg.*' -printf '%T@ %p\0' |
       sort -zn | head -zn -2 | cut -zd' ' -f2- |
       xargs -0 rm -f
+    find {{ haproxy_config_dir }} -name 'haproxy.cfg.*' -exec chmod 0640 {} +
   args:
     executable: /bin/bash
   changed_when: false
@@ -52,6 +55,7 @@
     find {{ keepalived_config_dir }} -name 'keepalived.conf.*' ! -name 'keepalived.conf.sample' -printf '%T@ %p\0' |
       sort -zn | head -zn -2 | cut -zd' ' -f2- |
       xargs -0 rm -f
+    find {{ keepalived_config_dir }} -name 'keepalived.conf.*' ! -name 'keepalived.conf.sample' -exec chmod 0640 {} +
   args:
     executable: /bin/bash
   changed_when: false

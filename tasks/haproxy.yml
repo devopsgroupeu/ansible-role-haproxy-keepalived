@@ -39,7 +39,11 @@
   ansible.builtin.template:
     src: haproxy.cfg.j2
     dest: "{{ haproxy_config_dir }}/haproxy.cfg"
-    mode: "0644"
+    # The config holds the stats credentials: readable by root and the
+    # HAProxy group only.
+    owner: root
+    group: "{{ haproxy_group }}"
+    mode: "0640"
     validate: "{{ haproxy_binary }} -f %s -c"
     backup: true
   no_log: true  # config renders the stats password; suppress --diff/-v leakage
