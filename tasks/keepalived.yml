@@ -11,9 +11,12 @@
     mode: "0644"
     backup: true
   no_log: true  # config renders the VRRP auth_pass; suppress --diff/-v leakage
+  register: keepalived_config_result
+  # Applied in-play by "Apply Keepalived configuration change" below so the VIP
+  # check runs against the new config (a deferred handler is lost when that
+  # check fails, and the rerun never re-notifies it).
   notify:
     - Cleanup keepalived config backups
-    - Reload keepalived
 
 - name: Validate Keepalived configuration
   when: keepalived_enabled | bool
@@ -36,9 +39,7 @@
     src: keepalived.service.d-override.conf.j2
     dest: /etc/systemd/system/keepalived.service.d/override.conf
     mode: "0644"
-  notify:
-    - Reload systemd
-    - Restart keepalived
+  register: keepalived_dropin_result
 
 - name: Configure the rsyslog configuration file to accept UDP syslog reception
   when: keepalived_enabled | bool
@@ -57,6 +58,24 @@
     state: started
     enabled: true
     daemon_reload: true
+  register: keepalived_service_start
+
+# A unit drop-in change needs a restart; a config, notify script or credentials
+# change only needs a reload (keepalived reads notify scripts at exec time).
+# Skipped when the task above just started the service with the new files.
+- name: Apply Keepalived configuration change
+  when:
+    - keepalived_enabled | bool
+    - >-
+      keepalived_config_result is changed
+      or keepalived_dropin_result is changed
+      or (keepalived_env_result | default({})) is changed
+      or (keepalived_notify_script_result | default({})) is changed
+    - keepalived_service_start is not changed
+  ansible.builtin.systemd_service:
+    name: keepalived
+    daemon_reload: true
+    state: "{{ 'restarted' if keepalived_dropin_result is changed else 'reloaded' }}"
 
 - name: Wait for Keepalived to initialize
   when: keepalived_enabled | bool
@@ -85,6 +104,13 @@
   ansible.builtin.command: ip addr show
   register: vip_check
   changed_when: false
-  failed_when: >
-    keepalived_vrrp_instances | map(attribute='virtual_ipaddress') |
-    select('in', vip_check.stdout) | list | length == 0
+  # Every configured VIP must be on an interface, compared as exact addresses
+  # (a substring match lets 10.0.0.10 pass on 10.0.0.100). Retried because a
+  # reload or a BACKUP-state start takes up to the VRRP master-down interval.
+  until: >-
+    keepalived_vrrp_instances | map(attribute='virtual_ipaddress')
+    | map('regex_replace', '/.*$', '')
+    | reject('in', vip_check.stdout | regex_findall('inet6? ([0-9a-f.:]+)/'))
+    | list | length == 0
+  retries: 10
+  delay: 2

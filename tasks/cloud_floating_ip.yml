@@ -49,7 +49,7 @@
       FLOATING_IP={{ cloud_floating_ip_address }}
   become: true
   no_log: true
-  notify: Restart keepalived
+  register: keepalived_env_result
 
 - name: Deploy cloud Floating IP notify script
   ansible.builtin.template:
@@ -59,7 +59,7 @@
     group: root
     mode: '0750'
   become: true
-  notify: Restart keepalived
+  register: keepalived_notify_script_result
 
 - name: Create log file for cloud Floating IP script
   ansible.builtin.file:

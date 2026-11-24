@@ -14,11 +14,21 @@
   vars:
     hkv_rotated_stats_pass: "rotated_password_654321"
   tasks:
-    - name: Re-apply the role with a rotated stats password
+    # Preemption is enabled for this run so the role's own VIP check runs on
+    # the master against the moved VIP.
+    - name: Re-apply the role with a rotated stats password and a moved VIP
       ansible.builtin.include_role:
         name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}"
       vars:
         haproxy_stats_page_pass: "{{ hkv_rotated_stats_pass }}"
+        keepalived_nopreempt: false
+        keepalived_vrrp_instances:
+          - vrrp_instance_name: VI_TEST
+            virtual_ipaddress: "172.18.0.110"
+            virtual_router_id: 51
+          - vrrp_instance_name: VI_TEST2
+            virtual_ipaddress: "172.18.0.101"
+            virtual_router_id: 52
 
     - name: Stats page accepts the rotated password
       ansible.builtin.uri:
@@ -36,6 +46,31 @@
         force_basic_auth: true
         status_code: 401
 
+    - name: Read interface addresses after the VIP change
+      ansible.builtin.command: ip -o addr show
+      register: hkv_addr_moved
+      changed_when: false
+
+    - name: Master carries the new VIP and no longer the old one
+      ansible.builtin.assert:
+        that:
+          - "'172.18.0.110' in hkv_addr_moved.stdout | regex_findall('inet ([0-9.]+)/')"
+          - "'172.18.0.101' in hkv_addr_moved.stdout | regex_findall('inet ([0-9.]+)/')"
+          - "'172.18.0.100' not in hkv_addr_moved.stdout | regex_findall('inet ([0-9.]+)/')"
+        fail_msg: "Running keepalived did not pick up the changed VIP: {{ hkv_addr_moved.stdout_lines }}"
+        success_msg: "VIP change applied in-play on the master"
+      when: inventory_hostname == haproxy_loadbalancer_master
+
+    - name: Backup carries none of the VIPs
+      ansible.builtin.assert:
+        that:
+          - "'172.18.0.110' not in hkv_addr_moved.stdout | regex_findall('inet ([0-9.]+)/')"
+          - "'172.18.0.101' not in hkv_addr_moved.stdout | regex_findall('inet ([0-9.]+)/')"
+          - "'172.18.0.100' not in hkv_addr_moved.stdout | regex_findall('inet ([0-9.]+)/')"
+        fail_msg: "Backup unexpectedly holds a VIP: {{ hkv_addr_moved.stdout_lines }}"
+        success_msg: "Backup holds no VIP"
+      when: inventory_hostname == haproxy_loadbalancer_backup
+
 - name: Restore the fixture configuration
   hosts: proxy_hosts
   become: true
@@ -52,3 +87,14 @@
         password: "{{ haproxy_stats_page_pass }}"
         force_basic_auth: true
         status_code: 200
+
+    - name: Master carries the fixture VIPs again
+      ansible.builtin.command: ip -o addr show
+      register: hkv_addr_restored
+      changed_when: false
+      until: >-
+        '172.18.0.100' in hkv_addr_restored.stdout | regex_findall('inet ([0-9.]+)/')
+        and '172.18.0.110' not in hkv_addr_restored.stdout | regex_findall('inet ([0-9.]+)/')
+      retries: 10
+      delay: 2
+      when: inventory_hostname == haproxy_loadbalancer_master
