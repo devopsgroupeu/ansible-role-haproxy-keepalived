@@ -93,6 +93,14 @@ haproxy_options:
 
 | `haproxy_journald` | `false` | Send HAProxy logs to journald via `/dev/log` instead of rsyslog UDP |
 
+**Log files and rotation.** With rsyslog logging the role writes
+`/var/log/haproxy-traffic.log` and `/var/log/haproxy-admin.log`; with Keepalived
+enabled `/var/log/keepalived.log`; with the cloud Floating IP feature
+`cloud_floating_ip_log`. `/etc/logrotate.d/haproxy-keepalived` rotates the ones
+in use (daily, 7 kept, compressed). On Debian/Ubuntu package installs the
+packaged rule `/etc/rsyslog.d/49-haproxy.conf` sorts first and sends HAProxy
+traffic to `/var/log/haproxy.log` (rotated by the package's own logrotate rule).
+
 ---
 
 ## SSL/TLS Hardening

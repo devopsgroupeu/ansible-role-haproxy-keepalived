@@ -19,6 +19,7 @@
   ansible.builtin.package:
     name:
       - curl
+      - logrotate
       - python3
       - rsyslog
     state: present
@@ -36,6 +37,7 @@
   ansible.builtin.package:
     name:
       - curl
+      - logrotate
       - python3
       - rsyslog
     state: present

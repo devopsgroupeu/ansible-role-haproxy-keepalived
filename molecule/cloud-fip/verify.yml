@@ -43,3 +43,21 @@
           - fip_log.stat.mode == '0600'
         fail_msg: "Cloud FIP log must be 0600"
         success_msg: "Cloud FIP log is 0600"
+
+    - name: Dry-run the role's logrotate rules
+      ansible.builtin.command: logrotate -d /etc/logrotate.d/haproxy-keepalived
+      register: hkv_logrotate
+      changed_when: false
+
+    - name: Verify logrotate covers the notify log and skips disabled keepalived
+      ansible.builtin.assert:
+        that:
+          - "'/var/log/cloud-floating-ip.log' in hkv_logrotate.stderr"
+          - "'/var/log/haproxy-traffic.log' in hkv_logrotate.stderr"
+          - "'/var/log/keepalived.log' not in hkv_logrotate.stderr"
+          # A missing state file on a host that never rotated is not a rule error.
+          - >-
+            hkv_logrotate.stderr_lines | select('search', '^error')
+            | reject('search', 'state file') | list | length == 0
+        fail_msg: "logrotate -d output: {{ hkv_logrotate.stderr_lines }}"
+        success_msg: "Notify log rotated; keepalived log not listed"

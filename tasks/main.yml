@@ -27,3 +27,10 @@
   ansible.builtin.import_tasks: keepalived.yml
   when: keepalived_enabled | bool
   tags: keepalived
+
+- name: Rotate role-managed log files
+  ansible.builtin.import_tasks: logrotate.yml
+  tags:
+    - haproxy
+    - keepalived
+    - cloud
