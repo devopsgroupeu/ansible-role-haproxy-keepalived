@@ -159,6 +159,43 @@
           Ansible Vault: vault_keepalived_auth_pass).
         success_msg: "VRRP auth credentials validated"
 
+    # keepalived uses only the first 8 characters of auth_pass and rejects the
+    # config (exit 5) when it has to truncate; catch it here with a readable
+    # message instead of behind the template's no_log.
+    - name: Validate VRRP auth - password length
+      when: keepalived_auth_type | default('') | length > 0
+      ansible.builtin.assert:
+        that:
+          - keepalived_auth_pass | length <= 8
+          - >-
+            keepalived_vrrp_instances
+            | map(attribute='auth_pass', default=keepalived_auth_pass)
+            | map('length') | reject('ge', 1) | list | length == 0
+          - >-
+            keepalived_vrrp_instances
+            | map(attribute='auth_pass', default=keepalived_auth_pass)
+            | map('length') | select('gt', 8) | list | length == 0
+        fail_msg: >-
+          VRRP auth_pass must be 1 to 8 characters (keepalived uses only the
+          first 8 and rejects a longer one). Check keepalived_auth_pass and the
+          auth_pass of these VRRP instances:
+          {% for i in keepalived_vrrp_instances %}{% set p = i.auth_pass | default(keepalived_auth_pass) %}{% if p | length < 1 or p | length > 8 %}{{ i.vrrp_instance_name | default('unnamed') }} {% endif %}{% endfor %}
+        success_msg: "VRRP auth_pass length validated"
+
+    - name: Validate virtual_router_id range
+      ansible.builtin.assert:
+        that:
+          - >-
+            keepalived_vrrp_instances | map(attribute='virtual_router_id')
+            | map('int') | reject('ge', 1) | list | length == 0
+          - >-
+            keepalived_vrrp_instances | map(attribute='virtual_router_id')
+            | map('int') | select('gt', 255) | list | length == 0
+        fail_msg: >-
+          virtual_router_id must be between 1 and 255. Current:
+          {{ keepalived_vrrp_instances | map(attribute='virtual_router_id') | list }}
+        success_msg: "All virtual_router_id values are within 1-255"
+
 - name: Display configuration summary
   ansible.builtin.debug:
     msg:

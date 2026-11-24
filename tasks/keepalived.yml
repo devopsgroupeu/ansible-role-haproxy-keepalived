@@ -3,12 +3,27 @@
   when: keepalived_enabled | bool
   ansible.builtin.include_tasks: "keepalived_install_{{ keepalived_install_method }}.yml"
 
+# A custom keepalived_config_dir is not created by the package or the source
+# install.
+- name: Ensure Keepalived configuration directory exists
+  when: keepalived_enabled | bool
+  ansible.builtin.file:
+    path: "{{ keepalived_config_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+# validate runs `keepalived -t -f <tmpfile>`, so a rejected config never
+# reaches disk (plain `keepalived -t` only checks the compiled-in default path
+# and exits 0 when that file is missing).
 - name: Copy Keepalived configuration
   when: keepalived_enabled | bool
   ansible.builtin.template:
     src: keepalived.conf.j2
     dest: "{{ keepalived_config_dir }}/keepalived.conf"
     mode: "0644"
+    validate: "{{ keepalived_binary }} -t -f %s"
     backup: true
   no_log: true  # config renders the VRRP auth_pass; suppress --diff/-v leakage
   register: keepalived_config_result
@@ -17,14 +32,6 @@
   # check fails, and the rerun never re-notifies it).
   notify:
     - Cleanup keepalived config backups
-
-- name: Validate Keepalived configuration
-  when: keepalived_enabled | bool
-  ansible.builtin.command:
-    cmd: "{{ keepalived_binary }} -t"
-  changed_when: false
-  register: keepalived_config_check
-  failed_when: keepalived_config_check.rc != 0
 
 - name: Create keepalived systemd drop-in directory
   when: keepalived_enabled | bool

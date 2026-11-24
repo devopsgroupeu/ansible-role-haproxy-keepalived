@@ -57,6 +57,9 @@ provisioner:
         keepalived_src_sha256: "sha256:5afe09d3730152b96cea66c97ea8cc5ee172a4c237e79804503efa8d5b0f8ba1"
         haproxy_stats_page_pass: "test_password_123456"
         keepalived_network_interface: eth0
+        # Non-default config dir: the template validates this file and the
+        # systemd drop-in must point keepalived at it.
+        keepalived_config_dir: /etc/keepalived-custom
         keepalived_vrrp_instances:
           - vrrp_instance_name: VI_SRC
             virtual_ipaddress: "172.18.0.230"

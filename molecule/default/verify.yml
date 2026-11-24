@@ -202,7 +202,7 @@
         success_msg: "Keepalived configuration file exists"
 
     - name: Validate Keepalived configuration
-      ansible.builtin.command: keepalived -t
+      ansible.builtin.command: keepalived -t -f /etc/keepalived/keepalived.conf
       changed_when: false
       register: keepalived_syntax_check
       failed_when: keepalived_syntax_check.rc != 0
@@ -428,6 +428,54 @@
         fail_msg: "Virtual IP not found on master node"
         success_msg: "Virtual IP is assigned to master node"
       when: not (keepalived_nopreempt | default(false) | bool)
+
+- name: Verify validate.yml rejects invalid VRRP settings
+  hosts: proxy-master
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Run validate.yml with a 9-character auth_pass
+      block:
+        - name: Include the role's validation tasks
+          ansible.builtin.include_role:
+            name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}"
+            tasks_from: validate
+          vars:
+            keepalived_auth_pass: "123456789"
+
+        - name: Fail when validation accepted the long auth_pass
+          ansible.builtin.fail:
+            msg: "validate.yml accepted a 9-character auth_pass"
+      rescue:
+        - name: Assert the auth_pass length check rejected it
+          ansible.builtin.assert:
+            that:
+              - "'must be 1 to 8 characters' in ansible_failed_result.msg"
+            fail_msg: "Unexpected failure: {{ ansible_failed_result.msg }}"
+            success_msg: "9-character auth_pass rejected by validate.yml"
+
+    - name: Run validate.yml with virtual_router_id 256
+      block:
+        - name: Include the role's validation tasks
+          ansible.builtin.include_role:
+            name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}"
+            tasks_from: validate
+          vars:
+            keepalived_vrrp_instances:
+              - vrrp_instance_name: VI_BAD
+                virtual_ipaddress: "172.18.0.120"
+                virtual_router_id: 256
+
+        - name: Fail when validation accepted the out-of-range router id
+          ansible.builtin.fail:
+            msg: "validate.yml accepted virtual_router_id 256"
+      rescue:
+        - name: Assert the router id range check rejected it
+          ansible.builtin.assert:
+            that:
+              - "'must be between 1 and 255' in ansible_failed_result.msg"
+            fail_msg: "Unexpected failure: {{ ansible_failed_result.msg }}"
+            success_msg: "virtual_router_id 256 rejected by validate.yml"
 
 - name: Display test summary
   hosts: proxy_hosts

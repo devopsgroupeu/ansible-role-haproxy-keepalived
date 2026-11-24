@@ -58,3 +58,19 @@
           - hap_unit.stat.exists
         fail_msg: "Source-built HAProxy systemd unit missing (source install did not deploy it)"
         success_msg: "Source-built HAProxy systemd unit present"
+
+    - name: Read the keepalived ExecStart in effect
+      ansible.builtin.systemd_service:
+        name: keepalived
+      register: ka_execstart
+
+    - name: Assert keepalived runs the config from the custom directory
+      ansible.builtin.assert:
+        that:
+          - "'-f /etc/keepalived-custom/keepalived.conf' in ka_execstart.status.ExecStart"
+        fail_msg: "keepalived does not use /etc/keepalived-custom/keepalived.conf: {{ ka_execstart.status.ExecStart }}"
+        success_msg: "keepalived uses the custom config directory"
+
+    - name: Validate the custom keepalived config with the source binary
+      ansible.builtin.command: /usr/local/sbin/keepalived -t -f /etc/keepalived-custom/keepalived.conf
+      changed_when: false
