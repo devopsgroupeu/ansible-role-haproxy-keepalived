@@ -14,14 +14,15 @@
   vars:
     hkv_rotated_stats_pass: "rotated_password_654321"
   tasks:
-    # Preemption is enabled for this run so the role's own VIP check runs on
-    # the master against the moved VIP.
+    # Preemption (with a delay) is enabled for this run so the role's own VIP
+    # check runs on the master against the moved VIP.
     - name: Re-apply the role with a rotated stats password and a moved VIP
       ansible.builtin.include_role:
         name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}"
       vars:
         haproxy_stats_page_pass: "{{ hkv_rotated_stats_pass }}"
         keepalived_nopreempt: false
+        keepalived_preempt_delay: 5
         keepalived_vrrp_instances:
           - vrrp_instance_name: VI_TEST
             virtual_ipaddress: "172.18.0.110"
@@ -45,6 +46,24 @@
         password: "{{ haproxy_stats_page_pass }}"
         force_basic_auth: true
         status_code: 401
+
+    - name: Read keepalived.conf rendered with preempt_delay
+      ansible.builtin.slurp:
+        src: /etc/keepalived/keepalived.conf
+      register: hkv_ka_preempt
+
+    - name: Assert preempt_delay renders with initial state BACKUP
+      ansible.builtin.assert:
+        that:
+          - "'preempt_delay 5' in (hkv_ka_preempt.content | b64decode)"
+          - "'state MASTER' not in (hkv_ka_preempt.content | b64decode)"
+          - "'nopreempt' not in (hkv_ka_preempt.content | b64decode)"
+        fail_msg: "preempt_delay must be rendered with state BACKUP (keepalived rejects it on MASTER)"
+        success_msg: "preempt_delay rendered with initial state BACKUP"
+
+    - name: Validate the preempt_delay config with keepalived
+      ansible.builtin.command: keepalived -t -f /etc/keepalived/keepalived.conf
+      changed_when: false
 
     - name: Read interface addresses after the VIP change
       ansible.builtin.command: ip -o addr show

@@ -386,7 +386,11 @@ keepalived_unicast_peers: []
 # the VIP; both nodes are then rendered with state BACKUP (required: nopreempt is
 # ignored on a MASTER-state node).
 keepalived_nopreempt: false
-keepalived_preempt_delay: 0   # seconds to wait before preempting (0 = instant; ignored when nopreempt is true)
+# Seconds to wait before preempting (0 = instant; ignored when nopreempt is
+# true). A positive value also renders both nodes with state BACKUP, because
+# keepalived ignores preempt_delay on a MASTER-state node; priority still
+# elects the master.
+keepalived_preempt_delay: 0
 
 # VRRP timing / protocol tunables (per-instance overridable).
 keepalived_advert_int: 1

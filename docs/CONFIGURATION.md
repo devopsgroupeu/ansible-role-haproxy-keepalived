@@ -310,7 +310,7 @@ VRRP timing, preemption, and sync-group behaviour (most are per-instance overrid
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `keepalived_nopreempt` | `false` | When true, a recovered master will NOT reclaim the VIP (both nodes rendered as BACKUP) |
-| `keepalived_preempt_delay` | `0` | Seconds to wait before preempting (`0` = instant; ignored when `nopreempt` is true) |
+| `keepalived_preempt_delay` | `0` | Seconds to wait before preempting (`0` = instant; ignored when `nopreempt` is true). A positive value renders both nodes with initial state `BACKUP` (keepalived ignores `preempt_delay` on a `MASTER`-state node); priority still elects the master |
 | `keepalived_advert_int` | `1` | VRRP advertisement interval in seconds |
 | `keepalived_vrrp_version` | `2` | VRRP protocol version (`2` or `3`) |
 | `keepalived_garp_master_delay` | `0` | Seconds before gratuitous ARP after becoming master (`0` = default) |
