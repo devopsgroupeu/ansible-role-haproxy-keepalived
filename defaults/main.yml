@@ -312,6 +312,33 @@ haproxy_backends: []
 # HAProxy Listen Sections
 # ----------------------------------------------------------------------------
 # Combined frontend+backend sections (less common, use frontends/backends instead)
+#
+# Available options (see docs/CONFIGURATION.md "Listen Sections"):
+#   - name: Unique name (required)
+#   - address: Bind address (default: "*")
+#   - port: Server port, and bind port unless listen_port is set (required)
+#   - listen_port: Bind port when it differs from the server port (optional)
+#   - mode: tcp (default) or http
+#   - balance: Load balancing algorithm (default: haproxy_listen_default_balance)
+#   - servers: Same three server specification methods as haproxy_backends
+#   - options: List of server options (check, inter, rise, fall, etc.)
+#   - httpcheck / httpcheck_method / httpcheck_uri / http_check: as for backends
+#   - ssl: Terminate TLS on the bind line; crts: list of certificate paths;
+#     ssl_min_ver: per-listen minimum TLS version
+#   - http_request_rules / http_response_rules: lists of rules
+#
+# Example:
+# haproxy_listens:
+#   - name: mysql
+#     address: "*"
+#     port: 3306
+#     mode: tcp
+#     balance: leastconn
+#     servers:
+#       - name: mysql01
+#         address: 10.0.2.10
+#     options:
+#       - check
 
 haproxy_listen_default_balance: roundrobin
 haproxy_listens: []

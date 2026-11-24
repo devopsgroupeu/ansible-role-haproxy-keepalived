@@ -76,6 +76,18 @@ haproxy_backends:
     port: 80
     options:
       - check
+# The documented listen schema (docs/INTEGRATION.md): port only, no listen_port
+haproxy_listens:
+  - name: mysql
+    address: "*"
+    port: 3306
+    mode: tcp
+    balance: leastconn
+    servers:
+      - name: mysql01
+        address: 127.0.0.1
+    options:
+      - check
 haproxy_global_extra: |
   tune.ssl.default-dh-param 2048
 haproxy_custom_sections: |

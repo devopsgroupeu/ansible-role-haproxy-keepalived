@@ -244,8 +244,28 @@ Combined frontend + backend in a single block. Less common — prefer separate `
 
 ```yaml
 haproxy_listen_default_balance: roundrobin
-haproxy_listens: []
+
+haproxy_listens:
+  - name: mysql                  # Required - unique name
+    address: "*"                 # Optional - bind address (default "*")
+    port: 3306                   # Required - server port, and bind port unless listen_port is set
+    listen_port: 3306            # Optional - bind port when it differs from port
+    mode: tcp                    # Optional - tcp (default) or http
+    balance: leastconn           # Optional - default haproxy_listen_default_balance
+    servers:                     # Required - same three methods as for backends
+      - name: mysql01
+        address: 10.0.2.10
+    options:                     # Optional - server options
+      - check
+    ssl: false                   # Optional - terminate TLS on the bind line
+    crts: []                     # Optional - certificate paths when ssl is true
+    ssl_min_ver: TLSv1.2         # Optional - default haproxy_ssl_min_ver
+    http_request_rules: []       # Optional - http-request rules
+    http_response_rules: []      # Optional - http-response rules
 ```
+
+Health checks use the same keys as backends (`httpcheck`, `httpcheck_method`,
+`httpcheck_uri`, `http_check`).
 
 ---
 

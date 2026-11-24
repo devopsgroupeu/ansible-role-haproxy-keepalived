@@ -131,6 +131,15 @@
         fail_msg: "haproxy -c reports ignored http-check rules: {{ haproxy_syntax_check.stderr }}"
         success_msg: "No http-check rules are ignored"
 
+    - name: Verify the listen section renders from the documented schema
+      ansible.builtin.assert:
+        that:
+          - "'listen mysql' in (hap_cfg_stats.content | b64decode)"
+          - "'bind *:3306' in (hap_cfg_stats.content | b64decode)"
+          - "'server mysql01 127.0.0.1:3306 check' in (hap_cfg_stats.content | b64decode)"
+        fail_msg: "listen section did not render from name/address/port/servers"
+        success_msg: "listen mysql rendered with bind *:3306"
+
     - name: Read backend states from the stats CSV
       ansible.builtin.uri:
         url: "http://localhost:1936/haproxy/stats;csv"
