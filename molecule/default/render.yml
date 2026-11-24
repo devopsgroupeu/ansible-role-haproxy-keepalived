@@ -102,3 +102,25 @@
           - "'ENV_FILE=\"/etc/keepalived-custom/cloud-floating-ip.env\"' in hkv_render_notify"
         fail_msg: "Notify script ignores keepalived_config_dir for its env file"
         success_msg: "Notify script env file follows keepalived_config_dir"
+
+    - name: Compute source make flags for HAProxy 3.4.8
+      ansible.builtin.set_fact:
+        hkv_flags_34: "{{ haproxy_make_flags }}"
+      vars:
+        haproxy_version: "3.4.8"
+
+    - name: Compute source make flags for HAProxy 3.0.31
+      ansible.builtin.set_fact:
+        hkv_flags_30: "{{ haproxy_make_flags }}"
+      vars:
+        haproxy_version: "3.0.31"
+
+    - name: Assert USE_SYSTEMD is passed only to HAProxy builds below 3.1
+      ansible.builtin.assert:
+        that:
+          - "'USE_SYSTEMD=1' not in hkv_flags_34"
+          - "'USE_QUIC=1' in hkv_flags_34"
+          - "'USE_SYSTEMD=1' in hkv_flags_30"
+          - "'pidfile' not in hkv_render_bool"
+        fail_msg: "Build flags or pidfile wrong: 3.4.8={{ hkv_flags_34 }} 3.0.31={{ hkv_flags_30 }}"
+        success_msg: "USE_SYSTEMD only below 3.1; no pidfile in global"

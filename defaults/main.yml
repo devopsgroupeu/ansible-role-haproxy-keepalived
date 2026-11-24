@@ -56,21 +56,23 @@ haproxy_branch: ""
 # places it elsewhere.
 haproxy_binary: "{{ '/usr/local/sbin/haproxy' if haproxy_install_method == 'source' else '/usr/sbin/haproxy' }}"
 
-# make flags for source-mode HAProxy builds. QUIC compat needs HAProxy >=2.9
-# and OpenSSL >=3.0, so it is added only on capable versions. Override the
-# whole list to fully customize the build.
+# make flags for source-mode HAProxy builds. USE_SYSTEMD=1 is added only
+# below HAProxy 3.1 (3.1 removed the option; -Ws works without it). QUIC
+# compat needs HAProxy >=2.9 and OpenSSL >=3.0, so it is added only on
+# capable versions. Override the whole list to fully customize the build.
 haproxy_make_flags_default:
   - "TARGET=linux-glibc"
   - "USE_OPENSSL=1"
   - "USE_PCRE2=1"
   - "USE_LUA=1"
   - "USE_SLZ=1"
-  - "USE_SYSTEMD=1"
   - "USE_PROMEX=1"
   - "USE_PCRE2_JIT=1"
 haproxy_make_flags: >-
-  {{ haproxy_make_flags_default + (['USE_QUIC=1', 'USE_QUIC_OPENSSL_COMPAT=1']
-     if haproxy_version is version('2.9', '>=') else []) }}
+  {{ haproxy_make_flags_default
+     + (['USE_SYSTEMD=1'] if haproxy_version is version('3.1', '<') else [])
+     + (['USE_QUIC=1', 'USE_QUIC_OPENSSL_COMPAT=1']
+        if haproxy_version is version('2.9', '>=') else []) }}
 
 # Purge the HAProxy build toolchain after a source install (saves space, reduces
 # LB attack surface). Only effective in source mode.

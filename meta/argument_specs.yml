@@ -61,21 +61,21 @@ argument_specs:
           - "USE_PCRE2=1"
           - "USE_LUA=1"
           - "USE_SLZ=1"
-          - "USE_SYSTEMD=1"
           - "USE_PROMEX=1"
           - "USE_PCRE2_JIT=1"
         description: >
           Base set of make flags for source-mode HAProxy builds. This is the
-          baseline; haproxy_make_flags is the override point where QUIC flags
-          are appended conditionally. Override haproxy_make_flags to fully
+          baseline; haproxy_make_flags is the override point where
+          USE_SYSTEMD (HAProxy < 3.1) and QUIC flags are appended conditionally. Override haproxy_make_flags to fully
           customize the build without touching this base.
       haproxy_make_flags:
         type: raw
         required: false
-        default: "{{ haproxy_make_flags_default + (['USE_QUIC=1', 'USE_QUIC_OPENSSL_COMPAT=1'] if haproxy_version is version('2.9', '>=') else []) }}"
+        default: "{{ haproxy_make_flags_default + (['USE_SYSTEMD=1'] if haproxy_version is version('3.1', '<') else []) + (['USE_QUIC=1', 'USE_QUIC_OPENSSL_COMPAT=1'] if haproxy_version is version('2.9', '>=') else []) }}"
         description: >
           Final list of make flags passed to the HAProxy build. Defaults to
-          haproxy_make_flags_default plus QUIC flags on HAProxy >= 2.9.
+          haproxy_make_flags_default plus USE_SYSTEMD=1 on HAProxy < 3.1 and
+          QUIC flags on HAProxy >= 2.9.
           Override this var (not haproxy_make_flags_default) to fully replace
           the flag set.
       haproxy_src_sha256:

@@ -163,6 +163,18 @@
       retries: 10
       delay: 2
 
+    - name: Read the HAProxy journal
+      ansible.builtin.command: journalctl -u haproxy --no-pager
+      register: hkv_hap_journal
+      changed_when: false
+
+    - name: Verify HAProxy does not warn about a duplicate pidfile
+      ansible.builtin.assert:
+        that:
+          - "'already specified' not in hkv_hap_journal.stdout"
+        fail_msg: "HAProxy logged a duplicate pidfile (the unit already passes -p)"
+        success_msg: "No duplicate pidfile warning"
+
     # ========================================================================
     # HAP-24: http-server-close not in default options
     # ========================================================================

@@ -48,7 +48,7 @@ latest versions, custom build flags, or air-gapped builds).
 | `haproxy_binary` | method-aware | Path to the haproxy binary (`/usr/local/sbin` source, `/usr/sbin` package) |
 | `haproxy_src_sha256` | `""` | SHA256 of the source tarball — **required in source mode** (`sha256:<hex>` or a `.sha256` URL) |
 | `haproxy_make_flags_default` | see `defaults/main.yml` | Base `make` flags for source builds |
-| `haproxy_make_flags` | derived | Effective `make` flags (adds QUIC on HAProxy >= 2.9); override to fully customize |
+| `haproxy_make_flags` | derived | Effective `make` flags (adds `USE_SYSTEMD=1` on HAProxy < 3.1 and QUIC on HAProxy >= 2.9); override to fully customize |
 | `haproxy_remove_build_deps` | `false` | Purge the HAProxy build toolchain after a source install |
 | `haproxy_offline_install` | `false` | Copy a pre-staged tarball from the controller instead of downloading |
 | `haproxy_src_local_path` | `""` | Controller path to the pre-staged HAProxy tarball (offline mode) |

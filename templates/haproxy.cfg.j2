@@ -19,7 +19,6 @@ global
     log 127.0.0.1 {{ haproxy_log_facility }}
 {% endif %}
     chroot {{ haproxy_socket_dir }}
-    pidfile /var/run/haproxy.pid
     maxconn {{ haproxy_maxconn }}
     user {{ haproxy_user }}
     group {{ haproxy_group }}
