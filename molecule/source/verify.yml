@@ -74,3 +74,30 @@
     - name: Validate the custom keepalived config with the source binary
       ansible.builtin.command: /usr/local/sbin/keepalived -t -f /etc/keepalived-custom/keepalived.conf
       changed_when: false
+
+    - name: Stat role-managed HAProxy directories
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - /etc/haproxy/certs
+        - /var/lib/haproxy
+        - /run/haproxy
+      register: hkv_hap_dirs
+
+    - name: Assert the directories belong to the custom haproxy_group
+      ansible.builtin.assert:
+        that:
+          - item.stat.gr_name == 'lbproxy'
+        fail_msg: "{{ item.item }} group is {{ item.stat.gr_name }}, expected lbproxy"
+        success_msg: "{{ item.item }} group is lbproxy"
+      loop: "{{ hkv_hap_dirs.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Stats page answers on the configured bind address
+      ansible.builtin.uri:
+        url: "http://{{ ansible_facts['default_ipv4']['address'] }}:1936/haproxy/stats"
+        user: admin
+        password: test_password_123456
+        force_basic_auth: true
+        status_code: 200

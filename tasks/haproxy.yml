@@ -7,7 +7,7 @@
     path: "{{ haproxy_config_dir }}/certs"
     state: directory
     owner: root
-    group: haproxy
+    group: "{{ haproxy_group }}"
     mode: "0750"
 
 - name: Deploy SSL certificates
@@ -15,7 +15,7 @@
     src: "{{ haproxy_ssl_cert_src }}"
     dest: "{{ haproxy_config_dir }}/certs/"
     owner: root
-    group: haproxy
+    group: "{{ haproxy_group }}"
     mode: "0640"
   when: haproxy_ssl_cert_src | length > 0
 
@@ -24,7 +24,7 @@
     path: "{{ haproxy_socket_dir }}"
     state: directory
     owner: root
-    group: haproxy
+    group: "{{ haproxy_group }}"
     mode: "0750"
 
 - name: Create HAProxy admin socket directory
@@ -89,8 +89,18 @@
     - haproxy_config_result is changed or haproxy_source_changed | default(false) | bool
     - haproxy_service_start is not changed
 
+# Probe the stats listener where it is bound: loopback for wildcard binds,
+# otherwise the configured address (bracketed in the URL when IPv6).
+- name: Determine the HAProxy stats check address
+  ansible.builtin.set_fact:
+    haproxy_stats_check_host: >-
+      {{ '127.0.0.1' if haproxy_stats_bind_addr in ['*', '0.0.0.0', '::', '']
+         else haproxy_stats_bind_addr }}
+  when: haproxy_stats | bool
+
 - name: Wait for HAProxy to be ready
   ansible.builtin.wait_for:
+    host: "{{ haproxy_stats_check_host }}"
     port: "{{ haproxy_stats_port }}"
     delay: 2
     timeout: 30
@@ -98,7 +108,9 @@
 
 - name: Verify HAProxy is responding
   ansible.builtin.uri:
-    url: "http://127.0.0.1:{{ haproxy_stats_port }}{{ haproxy_stats_page_uri }}"
+    url: >-
+      http://{{ '[' ~ haproxy_stats_check_host ~ ']' if ':' in haproxy_stats_check_host
+      else haproxy_stats_check_host }}:{{ haproxy_stats_port }}{{ haproxy_stats_page_uri }}
     user: "{{ haproxy_stats_page_user }}"
     password: "{{ haproxy_stats_page_pass }}"
     force_basic_auth: true

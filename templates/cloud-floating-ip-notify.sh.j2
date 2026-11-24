@@ -9,7 +9,7 @@
 
 set -euo pipefail
 
-ENV_FILE="/etc/keepalived/cloud-floating-ip.env"
+ENV_FILE="{{ keepalived_config_dir }}/cloud-floating-ip.env"
 if [ -r "$ENV_FILE" ]; then
     # shellcheck disable=SC1090
     source "$ENV_FILE"

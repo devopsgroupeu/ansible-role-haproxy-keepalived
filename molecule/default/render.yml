@@ -46,3 +46,59 @@
           - "'server hkv-render-app hkv-render-app' not in hkv_render_addr"
         fail_msg: "Server address did not fall back to ansible_host"
         success_msg: "ansible_host used as the server address"
+
+    - name: Render haproxy.cfg with string booleans (as passed by -e)
+      ansible.builtin.set_fact:
+        hkv_render_bool: "{{ lookup('ansible.builtin.template', hkv_role_dir ~ '/templates/haproxy.cfg.j2') }}"
+      vars:
+        haproxy_stats: "true"
+        haproxy_frontends:
+          - name: fe_str_true
+            address: "*"
+            port: 443
+            ssl: "true"
+            crts:
+              - /etc/haproxy/certs/site.pem
+            no_log: "yes"
+            default_backend: be_render
+          - name: fe_str_false
+            address: "*"
+            port: 80
+            ssl: "false"
+            redirect_https: "false"
+            no_log: "false"
+            default_backend: be_render
+        haproxy_backends:
+          - name: be_render
+            port: 8080
+            servers:
+              - name: app
+                address: 10.0.1.10
+
+    - name: Assert string booleans are honoured
+      vars:
+        hkv_fe_true: "{{ hkv_render_bool.split('frontend fe_str_true')[1].split('frontend ')[0] }}"
+        hkv_fe_false: "{{ hkv_render_bool.split('frontend fe_str_false')[1].split('backend ')[0] }}"
+      ansible.builtin.assert:
+        that:
+          - "'listen stats' in hkv_render_bool"
+          - "'bind *:443 ssl crt /etc/haproxy/certs/site.pem' in hkv_fe_true"
+          - "'no log' in hkv_fe_true"
+          - "'ssl' not in hkv_fe_false"
+          - "'redirect scheme https' not in hkv_fe_false"
+          - "'no log' not in hkv_fe_false"
+        fail_msg: "String booleans were not converted with | bool"
+        success_msg: "String booleans honoured in haproxy.cfg"
+
+    - name: Render the cloud notify script with a custom keepalived_config_dir
+      ansible.builtin.set_fact:
+        hkv_render_notify: "{{ lookup('ansible.builtin.template', hkv_role_dir ~ '/templates/cloud-floating-ip-notify.sh.j2') }}"
+      vars:
+        keepalived_config_dir: /etc/keepalived-custom
+
+    - name: Assert the notify script reads credentials from keepalived_config_dir
+      ansible.builtin.assert:
+        that:
+          - "'ENV_FILE=\"/etc/keepalived-custom/cloud-floating-ip.env\"' in hkv_render_notify"
+        fail_msg: "Notify script ignores keepalived_config_dir for its env file"
+        success_msg: "Notify script env file follows keepalived_config_dir"
