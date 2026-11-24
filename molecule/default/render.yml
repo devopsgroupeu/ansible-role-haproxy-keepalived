@@ -1,0 +1,48 @@
+---
+# ============================================================================
+# Offline template render checks (no target host)
+# ============================================================================
+# Renders role templates on the controller with the role defaults plus
+# per-task overrides, for cases the converged fixture cannot cover.
+# ============================================================================
+
+- name: Render role templates on the controller
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: false
+  vars_files:
+    - "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/defaults/main.yml"
+  vars:
+    hkv_role_dir: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}"
+  tasks:
+    - name: Add a backend host known only by ansible_host
+      ansible.builtin.add_host:
+        name: hkv-render-app
+        ansible_host: 10.0.1.10
+      changed_when: false
+
+    - name: Render haproxy.cfg with an ansible_host-only server
+      ansible.builtin.set_fact:
+        hkv_render_addr: "{{ lookup('ansible.builtin.template', hkv_role_dir ~ '/templates/haproxy.cfg.j2') }}"
+      vars:
+        haproxy_backends:
+          - name: be_render
+            port: 8080
+            servers:
+              - hkv-render-app
+              - name: hkv-render-app
+        haproxy_listens:
+          - name: li_render
+            port: 9000
+            servers:
+              - hkv-render-app
+
+    - name: Assert ansible_host is used when no facts or ansible_ssh_host exist
+      ansible.builtin.assert:
+        that:
+          - "(hkv_render_addr | regex_findall('server hkv-render-app 10.0.1.10:8080')) | length == 2"
+          - "'server hkv-render-app 10.0.1.10:9000' in hkv_render_addr"
+          - "'server hkv-render-app hkv-render-app' not in hkv_render_addr"
+        fail_msg: "Server address did not fall back to ansible_host"
+        success_msg: "ansible_host used as the server address"

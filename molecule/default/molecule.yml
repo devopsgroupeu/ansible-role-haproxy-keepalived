@@ -56,6 +56,8 @@ provisioner:
   config_options:
     defaults:
       interpreter_python: auto_silent
+      # The ansible-core 2.24 default: the role must not read injected facts.
+      inject_facts_as_vars: false
       callbacks_enabled: profile_tasks, timer
       stdout_callback: default
     ssh_connection:

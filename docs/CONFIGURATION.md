@@ -215,7 +215,9 @@ haproxy_backends:
 ```yaml
 servers: "{{ groups['app_servers'] | default([]) }}"
 ```
-Requires `gather_facts: true`. IPs resolved automatically from inventory.
+Each host resolves to `ansible_ssh_host`, then the gathered default IPv4
+address (`ansible_facts['default_ipv4']`), then `ansible_host`, then the
+hostname itself. Gather facts on the backend hosts to use their default IPv4.
 
 **Method 2 — Hostname list:**
 ```yaml

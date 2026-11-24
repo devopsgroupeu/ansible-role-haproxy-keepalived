@@ -1,4 +1,13 @@
 {{ ansible_managed | comment }}
+{# Address of an inventory host, read without INJECT_FACTS_AS_VARS:
+    ansible_ssh_host, then the gathered default IPv4, then ansible_host, then
+    the name itself. #}
+{% macro host_addr(h) -%}
+{{ hostvars[h]['ansible_ssh_host']
+   | default((hostvars[h]['ansible_facts'] | default({})).get('default_ipv4', {}).get('address'), true)
+   | default(hostvars[h]['ansible_host'], true)
+   | default(h, true) }}
+{%- endmacro %}
 
 {% if haproxy_config is defined and haproxy_config | length > 0 %}
 {{ haproxy_config }}
@@ -135,13 +144,13 @@ backend {{ backend.name }}
 {% endif %}
 {% for server in backend.servers %}
 {% if server is mapping and server.name is defined %}
-    server {{ server.name }} {{ server.address | default(hostvars[server.name]['ansible_default_ipv4']['address']) }}:{{ server.port | default(backend.port) }}{% if backend.options is defined %} {{ backend.options | join(' ') }}{% endif %}
+    server {{ server.name }} {{ server.address if server.address is defined else host_addr(server.name) }}:{{ server.port | default(backend.port) }}{% if backend.options is defined %} {{ backend.options | join(' ') }}{% endif %}
 
 {% elif server is mapping %}
     server {{ server.name | default('node' ~ loop.index) }} {{ server.address }}:{{ server.port | default(backend.port) }}{% if backend.options is defined %} {{ backend.options | join(' ') }}{% endif %}
 
 {% else %}
-    server {{ server }} {{ hostvars[server]['ansible_ssh_host'] | default(hostvars[server]['ansible_default_ipv4']['address']) | default(server) }}:{{ backend.port }}{% if backend.options is defined %} {{ backend.options | join(' ') }}{% endif %}
+    server {{ server }} {{ host_addr(server) }}:{{ backend.port }}{% if backend.options is defined %} {{ backend.options | join(' ') }}{% endif %}
 
 {% endif %}
 {% endfor %}
@@ -170,13 +179,13 @@ listen {{ listen.name }}
 {% endfor %}
 {% for server in listen.servers %}
 {% if server is mapping and server.name is defined %}
-    server {{ server.name }} {{ server.address | default(hostvars[server.name]['ansible_default_ipv4']['address']) }}:{{ server.port | default(listen.port) }}{% if listen.options is defined %} {{ listen.options | join(' ') }}{% endif %}
+    server {{ server.name }} {{ server.address if server.address is defined else host_addr(server.name) }}:{{ server.port | default(listen.port) }}{% if listen.options is defined %} {{ listen.options | join(' ') }}{% endif %}
 
 {% elif server is mapping %}
     server {{ server.name | default('node' ~ loop.index) }} {{ server.address }}:{{ server.port | default(listen.port) }}{% if listen.options is defined %} {{ listen.options | join(' ') }}{% endif %}
 
 {% else %}
-    server {{ server }} {{ hostvars[server]['ansible_ssh_host'] | default(hostvars[server]['ansible_default_ipv4']['address']) | default(server) }}:{{ listen.port }}{% if listen.options is defined %} {{ listen.options | join(' ') }}{% endif %}
+    server {{ server }} {{ host_addr(server) }}:{{ listen.port }}{% if listen.options is defined %} {{ listen.options | join(' ') }}{% endif %}
 
 {% endif %}
 {% endfor %}

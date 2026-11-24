@@ -7,6 +7,16 @@
 # so verify.yml runs against the documented group_vars.
 # ============================================================================
 
+# The role resolves inventory backend servers from their gathered facts.
+- name: Gather backend facts
+  hosts: backend_servers
+  gather_facts: false
+  tasks:
+    - name: Gather network facts
+      ansible.builtin.setup:
+        gather_subset:
+          - network
+
 - name: Re-converge with changed settings
   hosts: proxy_hosts
   become: true

@@ -29,7 +29,7 @@
       register: lua_dev_pkg
       changed_when: false
       failed_when: false
-      when: ansible_os_family == 'Debian'
+      when: ansible_facts['os_family'] == 'Debian'
 
     - name: Assert source-specific build deps absent in package mode (Debian/Ubuntu)
       ansible.builtin.assert:
@@ -37,7 +37,7 @@
           - lua_dev_pkg.rc != 0
         fail_msg: "liblua5.4-dev present in package mode (source build deps leaked)"
         success_msg: "Source-specific build deps absent in package mode"
-      when: ansible_os_family == 'Debian'
+      when: ansible_facts['os_family'] == 'Debian'
 
     - name: Validate HAProxy configuration syntax
       ansible.builtin.command: haproxy -c -f /etc/haproxy/haproxy.cfg

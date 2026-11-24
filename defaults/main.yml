@@ -240,14 +240,15 @@ haproxy_frontends: []
 #
 # Method 1: Ansible Inventory Groups (recommended for dynamic inventories)
 #   servers: "{{ groups['backend_servers'] | default([]) }}"
-#   - Automatically resolves hostnames to IP addresses
-#   - Uses ansible_ssh_host or ansible_default_ipv4.address
-#   - Requires gather_facts: true
+#   - Automatically resolves hostnames to IP addresses, in this order:
+#     ansible_ssh_host, the gathered default IPv4 address
+#     (ansible_facts['default_ipv4']), ansible_host, then the hostname itself
+#   - Gather facts on those hosts for the default IPv4 to be used
 #
 # Method 2: Simple Hostname List (good for static known hosts)
 #   servers: ["web01", "web02", "web03"]
-#   - Hostnames must be resolvable in Ansible inventory
-#   - IP addresses will be auto-detected from facts
+#   - Resolved like Method 1; a name that is not in the inventory is
+#     rendered as-is and must be resolvable by DNS
 #
 # Method 3: Detailed Configuration (most control, explicit IPs)
 #   servers:

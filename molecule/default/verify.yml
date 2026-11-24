@@ -131,6 +131,14 @@
         fail_msg: "haproxy -c reports ignored http-check rules: {{ haproxy_syntax_check.stderr }}"
         success_msg: "No http-check rules are ignored"
 
+    - name: Verify inventory servers resolve to addresses without injected facts
+      ansible.builtin.assert:
+        that:
+          - "(hap_cfg_stats.content | b64decode) is search('server backend1 [0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+:80')"
+          - "'server backend1 backend1:' not in (hap_cfg_stats.content | b64decode)"
+        fail_msg: "backend1 was not resolved to its gathered IPv4 address"
+        success_msg: "backend1 resolved from ansible_facts"
+
     - name: Verify the listen section renders from the documented schema
       ansible.builtin.assert:
         that:
@@ -557,3 +565,6 @@
           - "Configuration: Valid and active"
           - "=========================================="
       run_once: true
+
+- name: Render checks
+  ansible.builtin.import_playbook: render.yml

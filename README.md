@@ -320,7 +320,9 @@ Three methods are supported — choose based on your setup:
 servers: "{{ groups['app_servers'] }}"
 ```
 
-Hostnames are automatically resolved to IPs from your inventory.
+Hostnames are resolved from your inventory, in this order: `ansible_ssh_host`,
+the gathered default IPv4 address (`ansible_facts['default_ipv4']`),
+`ansible_host`, then the hostname itself.
 
 ### 2. Hostname list
 

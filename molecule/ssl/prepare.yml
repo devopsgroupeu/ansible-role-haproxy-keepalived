@@ -10,7 +10,7 @@
           - iproute2
           - openssl
         state: present
-      when: ansible_os_family == 'Debian'
+      when: ansible_facts['os_family'] == 'Debian'
 
     - name: Ensure certs directory exists
       ansible.builtin.file:
