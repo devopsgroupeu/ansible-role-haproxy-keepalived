@@ -1,0 +1,80 @@
+---
+# ============================================================================
+# Molecule Side Effect Playbook (ssl)
+# ============================================================================
+# Rotates the certificate on the controller and re-converges with --diff in a
+# nested ansible-playbook run, so the run output can be checked for key
+# material and the served certificate for the new serial.
+# ============================================================================
+
+- name: Rotate the certificate and re-converge with --diff
+  hosts: proxy_hosts
+  become: true
+  gather_facts: false
+  vars:
+    hkv_cert_src_dir: "{{ lookup('env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/certs"
+    hkv_serial_cmd: >-
+      set -o pipefail;
+      openssl s_client -connect 127.0.0.1:8443 -servername test.local </dev/null 2>/dev/null
+      | openssl x509 -noout -serial
+  tasks:
+    - name: Read the serial of the certificate HAProxy serves
+      ansible.builtin.shell: "{{ hkv_serial_cmd }}"
+      args:
+        executable: /bin/bash
+      register: hkv_serial_before
+      changed_when: false
+
+    - name: Generate a replacement certificate on the target
+      ansible.builtin.shell: |
+        set -o pipefail
+        mkdir -p /root/hkv-ssl-rotated
+        openssl req -x509 -newkey rsa:2048 -nodes \
+          -keyout /root/hkv-ssl-rotated/k.pem -out /root/hkv-ssl-rotated/c.pem \
+          -days 1 -subj "/CN=test.local" 2>/dev/null
+        cat /root/hkv-ssl-rotated/c.pem /root/hkv-ssl-rotated/k.pem > /root/hkv-ssl-rotated/test.pem
+      args:
+        executable: /bin/bash
+        creates: /root/hkv-ssl-rotated/test.pem
+
+    - name: Replace the controller-side certificate with the new one
+      ansible.builtin.fetch:
+        src: /root/hkv-ssl-rotated/test.pem
+        dest: "{{ hkv_cert_src_dir }}/test.pem"
+        flat: true
+
+    - name: Re-converge with --diff and capture the output
+      ansible.builtin.command:
+        argv:
+          - ansible-playbook
+          - --diff
+          - --inventory
+          - "{{ ansible_inventory_sources[0] }}"
+          - "{{ playbook_dir }}/converge.yml"
+      delegate_to: localhost
+      become: false
+      run_once: true
+      register: hkv_diff_run
+      changed_when: true
+
+    - name: Assert the --diff run leaked no key material
+      ansible.builtin.assert:
+        that:
+          - "'PRIVATE KEY' not in hkv_diff_run.stdout"
+          - "'PRIVATE KEY' not in hkv_diff_run.stderr"
+        fail_msg: "Certificate key material appeared in the --diff output"
+        success_msg: "No key material in the --diff output"
+
+    - name: Read the serial HAProxy serves after the rotation
+      ansible.builtin.shell: "{{ hkv_serial_cmd }}"
+      args:
+        executable: /bin/bash
+      register: hkv_serial_after
+      changed_when: false
+
+    - name: Assert HAProxy serves the rotated certificate
+      ansible.builtin.assert:
+        that:
+          - hkv_serial_after.stdout != hkv_serial_before.stdout
+        fail_msg: "HAProxy still serves {{ hkv_serial_before.stdout }} after the certificate change"
+        success_msg: "HAProxy serves the rotated certificate ({{ hkv_serial_after.stdout }})"

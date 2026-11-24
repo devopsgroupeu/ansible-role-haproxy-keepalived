@@ -17,6 +17,12 @@
     owner: root
     group: "{{ haproxy_group }}"
     mode: "0640"
+    directory_mode: "0750"
+  # PEM bundles carry private keys: keep them out of --diff and -v output.
+  diff: false
+  no_log: true
+  # Applied in-play by "Apply HAProxy configuration change" below.
+  register: haproxy_cert_result
   when: haproxy_ssl_cert_src | length > 0
 
 - name: Create HAProxy socket directory
@@ -80,9 +86,9 @@
     daemon_reload: true
   register: haproxy_service_start
 
-# Restart (not reload) on config change: the package auto-starts HAProxy on
-# the default config, and a soft reload over that process can leave the new
-# frontends unbound (no listening sockets). Skipped when the task above just
+# Restart (not reload) on a config or certificate change: the package
+# auto-starts HAProxy on the default config, and a soft reload over that
+# process can leave the new frontends unbound (no listening sockets). Skipped when the task above just
 # started the service, because it already runs the new config and binary.
 - name: Apply HAProxy configuration change
   ansible.builtin.systemd_service:
@@ -90,7 +96,10 @@
     state: restarted
     daemon_reload: true
   when:
-    - haproxy_config_result is changed or haproxy_source_changed | default(false) | bool
+    - >-
+      haproxy_config_result is changed
+      or haproxy_cert_result is changed
+      or haproxy_source_changed | default(false) | bool
     - haproxy_service_start is not changed
 
 # Probe the stats listener where it is bound: loopback for wildcard binds,

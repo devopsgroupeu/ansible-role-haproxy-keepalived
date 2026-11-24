@@ -19,6 +19,8 @@ platforms:
       - proxy_hosts
 provisioner:
   name: ansible
+  playbooks:
+    side_effect: side_effect.yml
   config_options:
     defaults:
       interpreter_python: auto_silent
@@ -31,6 +33,8 @@ provisioner:
         haproxy_loadbalancer_backup: "proxy-ssl-b"
         keepalived_enabled: false
         haproxy_stats_page_pass: "test_password_123456"
+        # Filled by prepare.yml and rotated by side_effect.yml.
+        haproxy_ssl_cert_src: "{{ lookup('env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/certs/"
         haproxy_frontends:
           - name: https_fe
             address: "127.0.0.1"
@@ -60,5 +64,6 @@ scenario:
     - prepare
     - converge
     - idempotence
+    - side_effect
     - verify
     - destroy

@@ -533,6 +533,8 @@ haproxy_config_dir: /etc/haproxy
 
 # Path (on the controller) to a directory of SSL certs to deploy into
 # {{ haproxy_config_dir }}/certs/. Empty = do not deploy any certs.
+# Files are deployed 0640 with no_log/diff off (they hold private keys); a
+# changed certificate restarts HAProxy in the same run.
 haproxy_ssl_cert_src: ""
 
 # Keepalived configuration file directory

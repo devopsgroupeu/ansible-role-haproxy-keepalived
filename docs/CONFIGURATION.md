@@ -403,7 +403,7 @@ you have specific filesystem requirements.
 | `haproxy_admin_socket` | `{{ haproxy_admin_socket_dir }}/admin.sock` | Admin socket path for hitless reloads |
 | `haproxy_hard_stop_after` | `30s` | Force-stop old workers this long after a reload (drains long-lived connections) |
 | `haproxy_install_dir` | `/usr/local/src` | Source compilation directory (source mode only) |
-| `haproxy_ssl_cert_src` | `""` | Controller dir of SSL certs to deploy into `{{ haproxy_config_dir }}/certs/`; empty = none |
+| `haproxy_ssl_cert_src` | `""` | Controller dir of SSL certs to deploy into `{{ haproxy_config_dir }}/certs/` (files `0640`, never shown in `--diff`; a changed cert restarts HAProxy in the same run); empty = none |
 | `keepalived_config_dir` | `/etc/keepalived` | Keepalived config directory (`keepalived.conf`) |
 
 `haproxy.cfg` (`root:{{ haproxy_group }}`) and `keepalived.conf` (`root:root`)
