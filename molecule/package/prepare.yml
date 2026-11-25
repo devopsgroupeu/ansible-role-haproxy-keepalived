@@ -18,10 +18,21 @@
         state: present
       when: ansible_facts['os_family'] == 'Debian'
 
-    - name: Install iproute (Rocky/RHEL)
+    # The Rocky container image has no procps-ng (sysctl) and no
+    # /etc/sysctl.d, both present on real EL9 hosts.
+    - name: Install iproute and procps-ng (Rocky/RHEL)
       ansible.builtin.package:
-        name: iproute
+        name:
+          - iproute
+          - procps-ng
         state: present
+      when: ansible_facts['os_family'] == 'RedHat'
+
+    - name: Create /etc/sysctl.d (Rocky/RHEL container image)
+      ansible.builtin.file:
+        path: /etc/sysctl.d
+        state: directory
+        mode: "0755"
       when: ansible_facts['os_family'] == 'RedHat'
 
     - name: Ensure systemd-journald is running

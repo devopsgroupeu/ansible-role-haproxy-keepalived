@@ -78,3 +78,19 @@
           - hkv_tmpfiles_reboot.stdout == '750:root:haproxy'
         fail_msg: "haproxy {{ hkv_hap_active.status.ActiveState }}, /run/haproxy {{ hkv_tmpfiles_reboot.stdout }}"
         success_msg: "/run/haproxy recreated by tmpfiles; HAProxy active"
+
+    # SELinux is disabled in the container (and absent on Debian/Ubuntu), so
+    # the haproxy_connect_any tasks must have been skipped: they would have
+    # installed python3-libsemanage, and seboolean fails without SELinux.
+    - name: Gather package facts (RHEL family)
+      ansible.builtin.package_facts:
+      when: ansible_facts['os_family'] == 'RedHat'
+
+    - name: Assert the SELinux tasks were skipped with SELinux disabled
+      ansible.builtin.assert:
+        that:
+          - (ansible_facts['selinux'] | default({})).get('status', 'disabled') != 'enabled'
+          - "'python3-libsemanage' not in ansible_facts['packages']"
+        fail_msg: "SELinux tasks ran although SELinux is not enabled"
+        success_msg: "SELinux tasks skipped (SELinux not enabled)"
+      when: ansible_facts['os_family'] == 'RedHat'

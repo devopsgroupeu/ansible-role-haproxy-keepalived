@@ -132,6 +132,15 @@ argument_specs:
           Complete HAProxy configuration as a literal string. When set, overrides
           all dynamically generated configuration. Use for advanced custom configs
           or migration from an existing setup.
+      haproxy_selinux_connect_any:
+        type: bool
+        required: false
+        default: true
+        description: >
+          On EL9 with SELinux enabled, set the persistent haproxy_connect_any
+          boolean so HAProxy may bind and connect to any port (the policy only
+          allows a few HTTP ports). Ignored when SELinux is disabled and on
+          Debian/Ubuntu.
       haproxy_user:
         type: str
         required: false

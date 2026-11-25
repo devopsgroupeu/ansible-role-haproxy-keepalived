@@ -70,6 +70,7 @@ latest versions, custom build flags, or air-gapped builds).
 | `haproxy_config` | `""` | Full config as a string — bypasses all template generation |
 | `haproxy_user` | `haproxy` | System user for the HAProxy process |
 | `haproxy_group` | `haproxy` | System group for the HAProxy process |
+| `haproxy_selinux_connect_any` | `true` | EL9 with SELinux enabled: set the persistent `haproxy_connect_any` boolean so HAProxy may use any port |
 | `haproxy_log_facility` | `local2` | Syslog facility (`local0`–`local7`) |
 | `haproxy_mode` | `http` | Default mode: `http` or `tcp` |
 | `haproxy_maxconn` | `3000` | Maximum simultaneous connections |

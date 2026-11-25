@@ -49,6 +49,27 @@
   when:
     - ansible_facts['os_family'] == 'Debian'
 
+# EL9 runs SELinux enforcing: haproxy_t may only bind a few HTTP ports, so the
+# stats port (1936) and e.g. the RKE2 ports (6443, 9345) need the
+# haproxy_connect_any boolean.
+- name: Allow HAProxy to use any port under SELinux (EL9)
+  when:
+    - haproxy_enabled | bool
+    - haproxy_selinux_connect_any | bool
+    - ansible_facts['os_family'] == 'RedHat'
+    - (ansible_facts['selinux'] | default({})).get('status', 'disabled') == 'enabled'
+  block:
+    - name: Install the SELinux policy management Python bindings
+      ansible.builtin.dnf:
+        name: python3-libsemanage
+        state: present
+
+    - name: Enable the haproxy_connect_any SELinux boolean
+      ansible.posix.seboolean:
+        name: haproxy_connect_any
+        state: true
+        persistent: true
+
 - name: Enable non-local binding for the VIP
   ansible.posix.sysctl:
     name: net.ipv4.ip_nonlocal_bind

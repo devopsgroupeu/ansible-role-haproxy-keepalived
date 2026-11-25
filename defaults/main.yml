@@ -106,6 +106,12 @@ haproxy_group: haproxy
 # Logs will be sent to rsyslog with this facility
 haproxy_log_facility: local2
 
+# EL9 with SELinux enabled: turn on the haproxy_connect_any boolean so HAProxy
+# may bind and connect to any port (the policy only allows a few HTTP ports,
+# not e.g. the stats port 1936 or 6443/9345). Ignored when SELinux is
+# disabled and on Debian/Ubuntu. Set false to manage the policy yourself.
+haproxy_selinux_connect_any: true
+
 # Default mode for frontends/backends (http or tcp)
 haproxy_mode: http
 

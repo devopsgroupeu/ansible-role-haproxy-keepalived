@@ -48,6 +48,10 @@ Ansible role that installs and configures **HAProxy** and **Keepalived** for hig
 - `become: true` (root access required)
 - Two proxy nodes for HA (one master, one backup)
 - Supported OS: Ubuntu 24.04 (Noble), Debian 12 (Bookworm) and 13 (Trixie); RHEL / Rocky Linux / Oracle Linux 9 (EL9, verified on real hosts)
+- EL9 with SELinux enabled: the role sets the persistent `haproxy_connect_any`
+  boolean (`haproxy_selinux_connect_any: true`), because the policy lets HAProxy
+  bind only a few HTTP ports (not the stats port 1936 or e.g. 6443/9345). Set it
+  to `false` to manage the SELinux policy yourself.
 
 **Version policy:** in source mode the role tracks HAProxy **LTS** branches
 (even-numbered: 3.0/3.2/3.4). The default is the newest LTS (`3.4.1`). In
