@@ -83,7 +83,9 @@ haproxy_el_builder_repo: >-
      if ansible_facts['distribution'] == 'RedHat' else 'crb' }}
 
 # Purge the HAProxy build toolchain after a source install (saves space, reduces
-# LB attack surface). Only effective in source mode.
+# LB attack surface). Only effective in source mode. The toolchain is installed
+# and removed only on runs that compile; when both components are built from
+# source in one run, Keepalived reinstalls the toolchain HAProxy removed.
 haproxy_remove_build_deps: false
 
 # Purge the Keepalived build toolchain after a source install. Defaults to the

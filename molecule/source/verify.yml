@@ -141,3 +141,14 @@
           - hkv_tmpfiles_reboot.stdout == '750:root:lbproxy'
         fail_msg: "haproxy {{ hkv_hap_active.status.ActiveState }}, /run/haproxy {{ hkv_tmpfiles_reboot.stdout }}"
         success_msg: "/run/haproxy recreated by tmpfiles; HAProxy active"
+
+    - name: Gather package facts
+      ansible.builtin.package_facts:
+
+    - name: Assert the build toolchain was removed after the source build
+      ansible.builtin.assert:
+        that:
+          - "'gcc' not in ansible_facts['packages']"
+          - "'make' not in ansible_facts['packages']"
+        fail_msg: "gcc/make still installed with haproxy_remove_build_deps: true"
+        success_msg: "Build toolchain removed after the source build"

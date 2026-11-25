@@ -56,6 +56,9 @@ provisioner:
         keepalived_version: "2.4.1"
         keepalived_src_sha256: "sha256:5afe09d3730152b96cea66c97ea8cc5ee172a4c237e79804503efa8d5b0f8ba1"
         haproxy_stats_page_pass: "test_password_123456"
+        # The toolchain must be installed and removed only on compiling runs,
+        # or idempotence fails.
+        haproxy_remove_build_deps: true
         # Non-default group and a non-loopback stats bind: the tasks must
         # honour both (directory groups, readiness checks).
         haproxy_group: lbproxy
