@@ -76,6 +76,12 @@ haproxy_make_flags: >-
      + (['USE_QUIC=1', 'USE_QUIC_OPENSSL_COMPAT=1']
         if haproxy_version is version('2.9', '>=') else []) }}
 
+# EL9 repo that provides lua-devel for source builds (enabled only for the
+# toolchain install): CRB on Rocky/Alma/Oracle, CodeReady Builder on RHEL.
+haproxy_el_builder_repo: >-
+  {{ 'codeready-builder-for-rhel-9-' ~ ansible_facts['architecture'] ~ '-rpms'
+     if ansible_facts['distribution'] == 'RedHat' else 'crb' }}
+
 # Purge the HAProxy build toolchain after a source install (saves space, reduces
 # LB attack surface). Only effective in source mode.
 haproxy_remove_build_deps: false

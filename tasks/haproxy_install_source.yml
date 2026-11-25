@@ -1,6 +1,8 @@
 ---
+# lua-devel is only in the EL9 CRB / CodeReady Builder repo.
 - name: Install HAProxy build toolchain (RHEL family)
-  ansible.builtin.package:
+  ansible.builtin.dnf:
+    enablerepo: "{{ haproxy_el_builder_repo }}"
     name:
       - make
       - gcc

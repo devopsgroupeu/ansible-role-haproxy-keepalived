@@ -90,6 +90,14 @@ argument_specs:
           haproxy_install_method=source. Accepts "sha256:<hex>" or a remote
           ".sha256" URL. haproxy.org publishes a sidecar checksum file next
           to each release tarball.
+      haproxy_el_builder_repo:
+        type: str
+        required: false
+        default: "{{ 'codeready-builder-for-rhel-9-' ~ ansible_facts['architecture'] ~ '-rpms' if ansible_facts['distribution'] == 'RedHat' else 'crb' }}"
+        description: >
+          EL9 repository enabled for the source-build toolchain install, which
+          needs lua-devel: crb on Rocky/Alma/Oracle Linux,
+          codeready-builder-for-rhel-9-<arch>-rpms on RHEL. Source mode only.
       haproxy_remove_build_deps:
         type: bool
         required: false
