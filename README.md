@@ -43,7 +43,7 @@ Ansible role that installs and configures **HAProxy** and **Keepalived** for hig
 
 ## Requirements
 
-- Ansible (ansible-core) >= 2.19
+- Ansible (ansible-core) >= 2.19, < 2.23 (2.22 needs Python >= 3.13 on the control node)
 - `ansible.posix` collection >= 1.5.0 (`ansible-galaxy collection install -r requirements.yml`)
 - `become: true` (root access required)
 - Two proxy nodes for HA (one master, one backup)

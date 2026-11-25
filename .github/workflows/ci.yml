@@ -13,8 +13,22 @@ concurrency:
 
 jobs:
   lint:
-    name: lint
+    name: lint (ansible-core ${{ matrix.ansible-core }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      # Every ansible-core line admitted by requirements.txt and meta/main.yml
+      # min_ansible_version; 2.22 needs Python >= 3.13 on the control node.
+      matrix:
+        include:
+          - ansible-core: "2.19"
+            python: "3.12"
+          - ansible-core: "2.20"
+            python: "3.12"
+          - ansible-core: "2.21"
+            python: "3.12"
+          - ansible-core: "2.22"
+            python: "3.13"
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -22,11 +36,11 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python }}
           cache: pip
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r requirements.txt "ansible-core==${{ matrix.ansible-core }}.*"
 
       - name: Run yamllint
         run: python -m yamllint .
