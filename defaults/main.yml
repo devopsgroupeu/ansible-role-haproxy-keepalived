@@ -47,9 +47,11 @@ haproxy_src_sha256: "sha256:2e62c4ce4fd77d3bc7cf17e586431663454456a078b7c8465b8f
 # Install method: 'package' (default, distro/repo-driven) or 'source' (compile).
 haproxy_install_method: package
 
-# Optional repo branch for package mode (e.g. "3.0" or "3.4"). Selects the
-# vbernat PPA (Ubuntu) / haproxy.debian.net backport (Debian) for that branch.
-# Empty = use the distribution's default HAProxy.
+# Optional repo branch for package mode (quote it: "3.2"). Selects the
+# vbernat PPA (Ubuntu) / haproxy.debian.net backport (Debian) for that branch
+# and installs haproxy=<branch>.*, which also moves an existing install.
+# Available: noble 3.0/3.2, bookworm 3.0/3.2, trixie 3.2/3.4 (validated;
+# not available on EL9). Empty = use the distribution's default HAProxy.
 haproxy_branch: ""
 
 # Absolute path to the haproxy binary (method-aware). Override if your distro

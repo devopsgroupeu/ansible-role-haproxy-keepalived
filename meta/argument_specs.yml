@@ -41,9 +41,12 @@ argument_specs:
         required: false
         default: ""
         description: >
-          Optional repo branch for package mode (e.g. "3.0" or "3.4"). Selects
-          the vbernat PPA (Ubuntu) or haproxy.debian.net backport (Debian) for
-          that branch. Empty = use the distribution's default HAProxy package.
+          Optional repo branch for package mode (e.g. "3.2"). Selects the
+          vbernat PPA (Ubuntu) or haproxy.debian.net backport (Debian) for that
+          branch and installs haproxy=<branch>.*, which also moves an existing
+          install. Available: noble 3.0/3.2, bookworm 3.0/3.2, trixie 3.2/3.4;
+          Debian/Ubuntu only. Empty = use the distribution's default HAProxy
+          package.
       haproxy_binary:
         type: str
         required: false

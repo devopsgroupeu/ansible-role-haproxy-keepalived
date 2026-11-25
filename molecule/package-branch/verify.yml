@@ -1,0 +1,61 @@
+---
+- name: Verify the requested HAProxy branch is installed
+  hosts: proxy_hosts
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Read the HAProxy version
+      ansible.builtin.command: haproxy -v
+      register: hkv_branch_v
+      changed_when: false
+
+    - name: Gather package facts
+      ansible.builtin.package_facts:
+
+    - name: Assert HAProxy runs the requested branch from the branch repo
+      vars:
+        hkv_installed: "{{ ansible_facts['packages']['haproxy'][0]['version'] }}"
+      ansible.builtin.assert:
+        that:
+          - hkv_branch_v.stdout is search('HAProxy version ' ~ (haproxy_branch | regex_escape) ~ '\\.')
+          - hkv_installed is match((haproxy_branch | regex_escape) ~ '\\.')
+          - >-
+            ('~bpo13' in hkv_installed) if ansible_facts['distribution'] == 'Debian'
+            else ('ppa' in hkv_installed)
+        fail_msg: "Expected branch {{ haproxy_branch }}: {{ hkv_branch_v.stdout_lines | first }}, package {{ hkv_installed }}"
+        success_msg: "HAProxy {{ hkv_installed }} from the {{ haproxy_branch }} branch repo"
+
+    - name: Gather service facts
+      ansible.builtin.service_facts:
+
+    - name: Assert HAProxy is running
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.services['haproxy.service'].state == 'running'
+        fail_msg: "HAProxy is not running after the branch install"
+        success_msg: "HAProxy running"
+
+- name: Verify validate.yml rejects a branch the release has no repo for
+  hosts: proxy_hosts
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Run validate.yml with an unavailable branch
+      block:
+        - name: Include the role's validation tasks
+          ansible.builtin.include_role:
+            name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}"
+            tasks_from: validate
+          vars:
+            haproxy_branch: "{{ hkv_unavailable_branch }}"
+
+        - name: Fail when validation accepted the unavailable branch
+          ansible.builtin.fail:
+            msg: "validate.yml accepted haproxy_branch {{ hkv_unavailable_branch }}"
+      rescue:
+        - name: Assert the branch check rejected it
+          ansible.builtin.assert:
+            that:
+              - "'is not available for' in ansible_failed_result.msg"
+            fail_msg: "Unexpected failure: {{ ansible_failed_result.msg }}"
+            success_msg: "haproxy_branch {{ hkv_unavailable_branch }} rejected by validate.yml"

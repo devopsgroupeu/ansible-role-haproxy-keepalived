@@ -44,7 +44,7 @@ latest versions, custom build flags, or air-gapped builds).
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `haproxy_install_method` | `package` | `package` (distro/repo) or `source` (compile) |
-| `haproxy_branch` | `""` | Package-mode repo branch (e.g. `3.0`, `3.4`); empty = distro default |
+| `haproxy_branch` | `""` | Package-mode repo branch (e.g. `"3.2"`, quoted); installs `haproxy=<branch>.*` from the branch repo, also on hosts that already have the distro package; empty = distro default. See the matrix below |
 | `haproxy_binary` | method-aware | Path to the haproxy binary (`/usr/local/sbin` source, `/usr/sbin` package) |
 | `haproxy_src_sha256` | `""` | SHA256 of the source tarball — **required in source mode** (`sha256:<hex>` or a `.sha256` URL) |
 | `haproxy_make_flags_default` | see `defaults/main.yml` | Base `make` flags for source builds |
@@ -58,6 +58,16 @@ latest versions, custom build flags, or air-gapped builds).
 | `keepalived_configure_flags_default` | see `defaults/main.yml` | Base `./configure` flags for source builds |
 | `keepalived_configure_flags` | = default list | Effective `./configure` flags; override the whole list to customize |
 | `keepalived_remove_build_deps` | `{{ haproxy_remove_build_deps }}` | Purge the Keepalived build toolchain after a source install |
+
+Branch repos for `haproxy_branch` (Debian: haproxy.debian.net
+`<release>-backports-<branch>`; Ubuntu: `ppa:vbernat/haproxy-<branch>`). Other
+pairs, and EL9, fail in validation:
+
+| Release | Branches |
+|---------|----------|
+| Ubuntu 24.04 (noble) | `3.0`, `3.2` |
+| Debian 12 (bookworm) | `3.0`, `3.2` |
+| Debian 13 (trixie) | `3.2`, `3.4` |
 
 ---
 

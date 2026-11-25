@@ -1,4 +1,19 @@
 ---
+# Downloaded once: the keyserver reorders the armor headers on every request,
+# so handing the URL to signed_by would rewrite the key on every run.
+- name: Download the vbernat PPA signing key (Ubuntu)
+  ansible.builtin.get_url:
+    # Launchpad signing_key_fingerprint of the vbernat PPAs.
+    url: "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x3D653970FBAB0A890E4E4E9A0F14D8B0CF4EFE96"
+    dest: /etc/apt/keyrings/haproxy-vbernat-ppa.asc
+    owner: root
+    group: root
+    mode: "0644"
+    force: false
+  when:
+    - ansible_facts['distribution'] == 'Ubuntu'
+    - haproxy_branch | length > 0
+
 - name: Add vbernat HAProxy PPA (Ubuntu, branch pinned)
   ansible.builtin.deb822_repository:
     name: "haproxy-{{ haproxy_branch }}"
@@ -6,9 +21,11 @@
     uris: "https://ppa.launchpadcontent.net/vbernat/haproxy-{{ haproxy_branch }}/ubuntu"
     suites: "{{ ansible_facts['distribution_release'] }}"
     components: [main]
-    signed_by: "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x6285FB2D3AB5FA8E"
+    signed_by: /etc/apt/keyrings/haproxy-vbernat-ppa.asc
+    install_python_debian: true
     state: present
     enabled: true
+  register: haproxy_branch_repo_ubuntu
   when:
     - ansible_facts['distribution'] == 'Ubuntu'
     - haproxy_branch | length > 0
@@ -20,13 +37,17 @@
     uris: "https://haproxy.debian.net"
     suites: "{{ ansible_facts['distribution_release'] }}-backports-{{ haproxy_branch }}"
     components: [main]
-    signed_by: "https://haproxy.debian.net/bernat.debian.org.gpg"
+    signed_by: "https://haproxy.debian.net/haproxy-archive-keyring.gpg"
+    install_python_debian: true
     state: present
     enabled: true
+  register: haproxy_branch_repo_debian
   when:
     - ansible_facts['distribution'] == 'Debian'
     - haproxy_branch | length > 0
 
+# The repo is NotAutomatic (apt priority 100) and its Origin is "PPA-haproxy";
+# the pin matches the host name of the repo URL instead.
 - name: Pin haproxy.debian.net branch package (Debian, ensures branch is preferred)
   ansible.builtin.template:
     src: haproxy-debian-pin.pref.j2
@@ -34,13 +55,26 @@
     owner: root
     group: root
     mode: "0644"
+  register: haproxy_branch_pin
   when:
     - ansible_facts['distribution'] == 'Debian'
     - haproxy_branch | length > 0
 
+# deb822_repository does not refresh the apt cache, and the cache_valid_time
+# of the install task below would keep the pre-repo cache.
+- name: Refresh apt cache after adding the branch repository
+  ansible.builtin.apt:
+    update_cache: true
+  when: >-
+    haproxy_branch_repo_ubuntu is changed
+    or haproxy_branch_repo_debian is changed
+    or haproxy_branch_pin is changed
+
+# "haproxy=<branch>.*" (the upstream install instruction) also moves an
+# already installed distro HAProxy onto the branch.
 - name: Install HAProxy (Debian/Ubuntu)
   ansible.builtin.apt:
-    name: haproxy
+    name: "{{ 'haproxy=' ~ haproxy_branch ~ '.*' if haproxy_branch | length > 0 else 'haproxy' }}"
     state: present
     update_cache: true
     cache_valid_time: 3600

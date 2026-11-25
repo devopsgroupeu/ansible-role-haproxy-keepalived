@@ -37,6 +37,28 @@
         fail_msg: "HAProxy version must be 2.0 or higher. Current: {{ haproxy_version | default('not set') }}"
         success_msg: "HAProxy version {{ haproxy_version }} is valid"
 
+    # Branch repos exist only for these releases (haproxy.debian.net
+    # *-backports-<branch> suites, vbernat haproxy-<branch> PPAs).
+    - name: Validate haproxy_branch for package installs
+      when:
+        - haproxy_install_method == 'package'
+        - haproxy_branch | string | length > 0
+      vars:
+        haproxy_branch_matrix:
+          noble: ["3.0", "3.2"]
+          bookworm: ["3.0", "3.2"]
+          trixie: ["3.2", "3.4"]
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['os_family'] == 'Debian'
+          - (haproxy_branch | string) in haproxy_branch_matrix.get(ansible_facts['distribution_release'], [])
+        fail_msg: >-
+          haproxy_branch '{{ haproxy_branch }}' is not available for
+          {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_release'] }}.
+          Branch repos exist for Debian/Ubuntu only, for these releases and
+          branches: {{ haproxy_branch_matrix | to_json }}.
+        success_msg: "haproxy_branch {{ haproxy_branch }} is available for {{ ansible_facts['distribution_release'] }}"
+
     - name: Validate HAProxy frontends and backends are defined
       when:
         - haproxy_config is not defined or haproxy_config | length == 0
