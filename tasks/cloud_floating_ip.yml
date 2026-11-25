@@ -21,11 +21,16 @@
       Store API token in Ansible Vault for security!
     success_msg: "Cloud Floating IP configuration validated"
 
+# curl-minimal (EL9 default) conflicts with the curl package but provides the
+# same binary.
+- name: Check for an installed curl binary
+  ansible.builtin.stat:
+    path: /usr/bin/curl
+  register: cloud_curl_binary
+
 - name: Install curl and jq for API calls
   ansible.builtin.package:
-    name:
-      - curl
-      - jq
+    name: "{{ ([] if cloud_curl_binary.stat.exists else ['curl']) + ['jq'] }}"
     state: present
   become: true
 

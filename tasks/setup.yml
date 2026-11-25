@@ -15,13 +15,18 @@
     home: "{{ haproxy_socket_dir }}"
     create_home: false
 
+# EL9 minimal and cloud images ship curl-minimal, which conflicts with the
+# curl package; either one provides the curl binary the role needs.
+- name: Check for an installed curl binary (RHEL/CentOS/Rocky Linux)
+  ansible.builtin.stat:
+    path: /usr/bin/curl
+  register: haproxy_curl_binary
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+
 - name: Install runtime prerequisites on RHEL/CentOS/Rocky Linux
   ansible.builtin.package:
-    name:
-      - curl
-      - logrotate
-      - python3
-      - rsyslog
+    name: "{{ ([] if haproxy_curl_binary.stat.exists else ['curl']) + ['logrotate', 'python3', 'rsyslog'] }}"
     state: present
   when:
     - ansible_facts['os_family'] == 'RedHat'
