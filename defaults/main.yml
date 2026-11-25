@@ -520,6 +520,7 @@ haproxy_socket_dir: /var/lib/haproxy
 
 # Admin runtime socket for hitless reloads. MUST live OUTSIDE the chroot
 # ({{ haproxy_socket_dir }}) so the master process can reach it during reload.
+# Both directories are recreated at boot by /etc/tmpfiles.d/haproxy.conf.
 haproxy_admin_socket_dir: /run/haproxy
 haproxy_admin_socket: "{{ haproxy_admin_socket_dir }}/admin.sock"
 

@@ -25,6 +25,18 @@
   register: haproxy_cert_result
   when: haproxy_ssl_cert_src | length > 0
 
+# /run is a tmpfs and nothing recreates the admin socket directory at boot on
+# EL9 or for the source-built unit; Debian's vendor rule recreates it with a
+# different mode. The file below shadows /usr/lib/tmpfiles.d/haproxy.conf.
+- name: Persist HAProxy runtime directories across reboots
+  ansible.builtin.template:
+    src: haproxy-tmpfiles.conf.j2
+    dest: /etc/tmpfiles.d/haproxy.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Apply HAProxy tmpfiles rules
+
 - name: Create HAProxy socket directory
   ansible.builtin.file:
     path: "{{ haproxy_socket_dir }}"

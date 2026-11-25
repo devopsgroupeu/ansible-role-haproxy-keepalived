@@ -1,0 +1,5 @@
+{{ ansible_managed | comment }}
+# Shadows the vendor /usr/lib/tmpfiles.d/haproxy.conf (same basename), so both
+# role-managed runtime directories are recreated at boot with the role's modes.
+d {{ haproxy_socket_dir }} 0750 root {{ haproxy_group }} -
+d {{ haproxy_admin_socket_dir }} 0750 root {{ haproxy_group }} -

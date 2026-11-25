@@ -413,12 +413,16 @@ you have specific filesystem requirements.
 |----------|---------|-------------|
 | `haproxy_config_dir` | `/etc/haproxy` | HAProxy config directory (`haproxy.cfg`, `certs/`) |
 | `haproxy_socket_dir` | `/var/lib/haproxy` | Runtime directory for Unix sockets and chroot |
-| `haproxy_admin_socket_dir` | `/run/haproxy` | Admin runtime socket dir — must live OUTSIDE `haproxy_socket_dir` (chroot) |
+| `haproxy_admin_socket_dir` | `/run/haproxy` | Admin runtime socket dir — must live OUTSIDE `haproxy_socket_dir` (chroot); recreated at boot by `/etc/tmpfiles.d/haproxy.conf` |
 | `haproxy_admin_socket` | `{{ haproxy_admin_socket_dir }}/admin.sock` | Admin socket path for hitless reloads |
 | `haproxy_hard_stop_after` | `30s` | Force-stop old workers this long after a reload (drains long-lived connections) |
 | `haproxy_install_dir` | `/usr/local/src` | Source compilation directory (source mode only) |
 | `haproxy_ssl_cert_src` | `""` | Controller dir of SSL certs to deploy into `{{ haproxy_config_dir }}/certs/` (files `0640`, never shown in `--diff`; a changed cert restarts HAProxy in the same run); empty = none |
 | `keepalived_config_dir` | `/etc/keepalived` | Keepalived config directory (`keepalived.conf`) |
+
+`/etc/tmpfiles.d/haproxy.conf` (it replaces the vendor file of the same name)
+recreates `haproxy_socket_dir` and `haproxy_admin_socket_dir` as
+`0750 root:{{ haproxy_group }}` at every boot, because `/run` is a tmpfs.
 
 `haproxy.cfg` (`root:{{ haproxy_group }}`) and `keepalived.conf` (`root:root`)
 are written with mode `0640`, as are the config backups the role keeps, because

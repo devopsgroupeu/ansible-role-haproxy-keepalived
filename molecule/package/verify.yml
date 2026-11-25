@@ -51,3 +51,30 @@
           - hap_syntax.rc == 0
         fail_msg: "HAProxy configuration syntax invalid in package mode"
         success_msg: "HAProxy configuration valid in package mode"
+
+    # /run/haproxy is lost on reboot; only the role's tmpfiles rule brings it
+    # back on EL9 before HAProxy binds admin.sock.
+    - name: Simulate a reboot of /run/haproxy and restart HAProxy
+      ansible.builtin.shell: |
+        set -o pipefail
+        rm -rf /run/haproxy
+        systemd-tmpfiles --create haproxy.conf
+        systemctl restart haproxy
+        stat -c %a:%U:%G /run/haproxy
+      args:
+        executable: /bin/bash
+      register: hkv_tmpfiles_reboot
+      changed_when: true
+
+    - name: Read the HAProxy state after the restart
+      ansible.builtin.systemd_service:
+        name: haproxy
+      register: hkv_hap_active
+
+    - name: Assert HAProxy runs with a recreated admin socket directory
+      ansible.builtin.assert:
+        that:
+          - hkv_hap_active.status.ActiveState == 'active'
+          - hkv_tmpfiles_reboot.stdout == '750:root:haproxy'
+        fail_msg: "haproxy {{ hkv_hap_active.status.ActiveState }}, /run/haproxy {{ hkv_tmpfiles_reboot.stdout }}"
+        success_msg: "/run/haproxy recreated by tmpfiles; HAProxy active"

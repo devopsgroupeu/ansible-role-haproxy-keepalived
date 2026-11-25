@@ -459,6 +459,28 @@
         fail_msg: "Certificate directory not found"
         success_msg: "Certificate directory exists"
 
+    - name: Re-apply the tmpfiles rule for haproxy.conf as at boot
+      ansible.builtin.command: systemd-tmpfiles --create haproxy.conf
+      changed_when: false
+
+    - name: Stat the admin socket directory after systemd-tmpfiles
+      ansible.builtin.stat:
+        path: /run/haproxy
+      register: hkv_run_haproxy
+
+    - name: Verify tmpfiles keeps the role's mode on /run/haproxy
+      ansible.builtin.assert:
+        that:
+          - hkv_run_haproxy.stat.isdir
+          - hkv_run_haproxy.stat.mode == '0750'
+          - hkv_run_haproxy.stat.pw_name == 'root'
+          - hkv_run_haproxy.stat.gr_name == 'haproxy'
+        fail_msg: >-
+          /run/haproxy is {{ hkv_run_haproxy.stat.mode }}
+          {{ hkv_run_haproxy.stat.pw_name }}:{{ hkv_run_haproxy.stat.gr_name }}
+          after systemd-tmpfiles (vendor rule not shadowed)
+        success_msg: "/run/haproxy is 0750 root:haproxy after systemd-tmpfiles"
+
     - name: Stat the credential-bearing configs
       ansible.builtin.stat:
         path: "{{ item }}"
