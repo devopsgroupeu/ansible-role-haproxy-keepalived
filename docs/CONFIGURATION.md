@@ -53,7 +53,7 @@ latest versions, custom build flags, or air-gapped builds).
 | `haproxy_src_sha256` | `sha256:024bd521a6cbbe32b426853147e6bbd6a89b107c5a34144846193fee5b7c6ed1` | SHA256 of the source tarball, matching the default `haproxy_version`; override both together (`sha256:<hex>` or a `.sha256` URL) |
 | `haproxy_make_flags_default` | see `defaults/main.yml` | Base `make` flags for source builds |
 | `haproxy_make_flags` | derived | Effective `make` flags (adds `USE_SYSTEMD=1` on HAProxy < 3.1 and QUIC on HAProxy >= 2.9); override to fully customize |
-| `haproxy_el_builder_repo` | `crb` (RHEL: `codeready-builder-for-rhel-9-<arch>-rpms`) | EL9 repo enabled for the source-build toolchain (provides `lua-devel`) |
+| `haproxy_el_builder_repo` | `crb` (Oracle Linux: `ol9_codeready_builder`, RHEL: `codeready-builder-for-rhel-9-<arch>-rpms`) | EL9 repo enabled for the source-build toolchain (provides `lua-devel`) |
 | `haproxy_remove_build_deps` | `false` | Purge the HAProxy build toolchain after a source install |
 | `haproxy_offline_install` | `false` | Copy a pre-staged tarball from the controller instead of downloading |
 | `haproxy_src_local_path` | `""` | Controller path to the pre-staged HAProxy tarball (offline mode) |

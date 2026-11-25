@@ -99,11 +99,16 @@ argument_specs:
       haproxy_el_builder_repo:
         type: str
         required: false
-        default: "{{ 'codeready-builder-for-rhel-9-' ~ ansible_facts['architecture'] ~ '-rpms' if ansible_facts['distribution'] == 'RedHat' else 'crb' }}"
+        default: >-
+          {{ 'codeready-builder-for-rhel-9-' ~ ansible_facts['architecture'] ~ '-rpms'
+          if ansible_facts['distribution'] == 'RedHat'
+          else 'ol9_codeready_builder' if ansible_facts['distribution'] == 'OracleLinux'
+          else 'crb' }}
         description: >
           EL9 repository enabled for the source-build toolchain install, which
-          needs lua-devel: crb on Rocky/Alma/Oracle Linux,
-          codeready-builder-for-rhel-9-<arch>-rpms on RHEL. Source mode only.
+          needs lua-devel: crb on Rocky/Alma Linux, ol9_codeready_builder on
+          Oracle Linux, codeready-builder-for-rhel-9-<arch>-rpms on RHEL.
+          Source mode only.
       haproxy_remove_build_deps:
         type: bool
         required: false
