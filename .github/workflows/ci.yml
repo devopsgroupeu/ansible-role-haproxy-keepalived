@@ -6,6 +6,10 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main, develop]
+  # The failover scenario runs only on these two triggers.
+  workflow_dispatch:
+  schedule:
+    - cron: "0 4 * * 1"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -48,18 +52,35 @@ jobs:
       - name: Run ansible-lint
         run: ansible-lint --profile production .
 
+      # Every haproxy_version / keepalived_version literal in the docs and
+      # examples must equal the role default.
+      - name: Check documented versions match defaults
+        shell: bash
+        run: |
+          set -eu
+          rc=0
+          for c in haproxy keepalived; do
+            want=$(sed -n "s/^${c}_version: \"\([0-9.]*\)\"$/\1/p" defaults/main.yml)
+            while IFS= read -r line; do
+              got=$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+' <<<"${line#*:*:}" | head -n1)
+              if [ "$got" != "$want" ]; then
+                echo "::error::$(cut -d: -f1,2 <<<"$line"): ${c}_version ${got} differs from defaults/main.yml (${want})"
+                rc=1
+              fi
+            done < <(grep -nE "${c}_version" README.md docs/*.md examples/*.yml | grep -E '[0-9]+\.[0-9]+\.[0-9]+' || true)
+          done
+          exit "$rc"
+
   molecule:
     name: molecule (${{ matrix.distro }} / ${{ matrix.scenario }})
     runs-on: ubuntu-latest
     needs: [lint]
     strategy:
       fail-fast: false
-      # CI tests the container-reliable matrix (Debian + Ubuntu) on the
-      # deterministic install scenarios. EL9 is a supported platform validated
-      # on real hosts (RockyLinux containers have known sudo/PAM quirks). The
-      # `failover` scenario performs real VRRP VIP migration and is validated
-      # locally / on real hosts (VRRP election is unreliable in CI container
-      # networking) - run `molecule test -s failover` to validate it.
+      # Every prepare removes the images' policy-rc.d shim, so package installs
+      # start services as on real hosts. EL9 runs the package scenario only
+      # (SELinux cannot be exercised in a container). The failover scenario is
+      # a separate job below.
       matrix:
         distro:
           - ubuntu2404
@@ -70,6 +91,16 @@ jobs:
           - package
           - ssl
           - cloud-fip
+        include:
+          - distro: debian12
+            scenario: source
+          - distro: debian13
+            scenario: source
+          - distro: rockylinux9
+            scenario: package
+          # package-branch pins its own images (debian13 + ubuntu2404).
+          - distro: debian13
+            scenario: package-branch
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -85,6 +116,40 @@ jobs:
 
       - name: Run molecule
         run: molecule test -s ${{ matrix.scenario }}
+        env:
+          MOLECULE_DISTRO: ${{ matrix.distro }}
+          PY_COLORS: "1"
+          ANSIBLE_FORCE_COLOR: "1"
+
+  # Real VRRP VIP migration between two containers. Election timing on shared
+  # CI runners is less reliable, so this runs on demand and weekly instead of
+  # gating pull requests.
+  molecule-failover:
+    name: molecule (${{ matrix.distro }} / failover)
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    needs: [lint]
+    strategy:
+      fail-fast: false
+      matrix:
+        distro:
+          - ubuntu2404
+          - debian12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install test dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run molecule
+        run: molecule test -s failover
         env:
           MOLECULE_DISTRO: ${{ matrix.distro }}
           PY_COLORS: "1"

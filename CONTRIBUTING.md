@@ -50,6 +50,12 @@ ansible-lint --profile production
 molecule test -s default
 ```
 
+CI also runs `package` (including `MOLECULE_DISTRO=rockylinux9`),
+`package-branch`, `source` (`debian12`, `debian13`), `ssl` and `cloud-fip`;
+`failover` runs weekly and on demand. Pick the image with `MOLECULE_DISTRO`
+(`ubuntu2404`, `debian12`, `debian13`, `rockylinux9`), e.g.
+`MOLECULE_DISTRO=debian13 molecule test -s source`.
+
 If your change is non-trivial, open an issue first so we can discuss the approach.
 
 ## Obvious Fix Policy
