@@ -217,7 +217,7 @@
     # HAP-16: Source-specific build deps absent in package mode
     # Note: the geerlingguy base image ships gcc/build-essential pre-installed.
     # We assert the role-specific source deps (liblua5.4-dev, libpcre2-dev)
-    # were NOT installed — those are only added by haproxy_install_source.yml.
+    # were NOT installed - those are only added by haproxy_install_source.yml.
     # ========================================================================
 
     - name: Check for liblua5.4-dev (source-only HAProxy build dep)
@@ -641,6 +641,34 @@
               - "'must be between 1 and 255' in ansible_failed_result.msg"
             fail_msg: "Unexpected failure: {{ ansible_failed_result.msg }}"
             success_msg: "virtual_router_id 256 rejected by validate.yml"
+
+    - name: Run validate.yml with an IPv6 VIP
+      block:
+        - name: Include the role's validation tasks
+          ansible.builtin.include_role:
+            name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}"
+            tasks_from: validate
+          vars:
+            keepalived_vrrp_instances:
+              - vrrp_instance_name: VI_V6
+                virtual_ipaddress: "2001:db8::100/64"
+                virtual_router_id: 53
+
+        - name: Fail when validation accepted the IPv6 VIP
+          ansible.builtin.fail:
+            msg: "validate.yml accepted an IPv6 VIP"
+      rescue:
+        # The VIP check loops over the instances: the message is per item.
+        - name: Assert the VIP check names the IPv4-only limit
+          vars:
+            hkv_v6_msgs: >-
+              {{ ansible_failed_result.results | default([ansible_failed_result])
+                 | map(attribute='msg') | join(' ') }}
+          ansible.builtin.assert:
+            that:
+              - "'IPv6 VIPs are not supported by this role' in hkv_v6_msgs"
+            fail_msg: "Unexpected failure: {{ hkv_v6_msgs }}"
+            success_msg: "IPv6 VIP rejected with the IPv4-only message"
 
 - name: Display test summary
   hosts: proxy_hosts

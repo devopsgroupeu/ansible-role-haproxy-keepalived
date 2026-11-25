@@ -35,7 +35,7 @@ haproxy_stats: true
 haproxy_stats_port: 1936
 haproxy_stats_page_uri: "/haproxy/stats"
 haproxy_stats_page_user: "admin"
-haproxy_stats_page_pass: "{{ vault_haproxy_stats_password }}"  # Store in vault!
+haproxy_stats_page_pass: "{{ vault_haproxy_stats_pass }}"  # Store in vault!
 
 # Frontend configuration
 haproxy_frontends:
@@ -56,10 +56,10 @@ haproxy_frontends:
     options:
       - forwardfor
       - httplog
-    # Uncomment for SSL/TLS:
-    # bind_options:
-    #   - ssl
-    #   - crt /etc/haproxy/certs/certificate.pem
+    # Uncomment for SSL/TLS (PEM deployed via haproxy_ssl_cert_src):
+    # ssl: true
+    # crts:
+    #   - /etc/haproxy/certs/certificate.pem
 
 # Backend configuration
 haproxy_backends:
@@ -101,9 +101,9 @@ keepalived_vrrp_instances:
     # This IP must be in the same subnet as your private network
     virtual_ipaddress: "10.0.0.100"  # Change to your private network range
     virtual_router_id: 51  # Must be unique in your network (1-255)
-    # Optional: Override priorities (default: master=100, backup=90)
-    # priority_master: 100
-    # priority_backup: 90
+    # Optional: override the priority on this node (default: master=100,
+    # backup=90, assigned from haproxy_loadbalancer_master/backup)
+    # priority: 100
 
 # ============================================================================
 # Cloud Provider Floating IP Integration
@@ -129,16 +129,12 @@ cloud_floating_ip_address: "95.217.27.127"  # Change to your Hetzner Floating IP
 # cloud_server_name: "{{ inventory_hostname }}"
 
 # ============================================================================
-# Optional: Rsyslog for Centralized Logging
+# Logging
 # ============================================================================
-# Uncomment to enable rsyslog configuration
-# haproxy_rsyslog_enabled: true
-# haproxy_rsyslog_server: "syslog.example.com"
-# haproxy_rsyslog_port: 514
-
-# keepalived_rsyslog_enabled: true
-# keepalived_rsyslog_server: "syslog.example.com"
-# keepalived_rsyslog_port: 514
+# HAProxy logs to local rsyslog by default (or journald with
+# haproxy_journald: true); Keepalived logs to /var/log/keepalived.log.
+# haproxy_log_facility: local2
+# keepalived_log_facility: local1
 
 # ============================================================================
 # Usage Instructions

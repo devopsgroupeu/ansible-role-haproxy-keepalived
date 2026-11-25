@@ -59,7 +59,7 @@ jobs:
       # on real hosts (RockyLinux containers have known sudo/PAM quirks). The
       # `failover` scenario performs real VRRP VIP migration and is validated
       # locally / on real hosts (VRRP election is unreliable in CI container
-      # networking) — run `molecule test -s failover` to validate it.
+      # networking) - run `molecule test -s failover` to validate it.
       matrix:
         distro:
           - ubuntu2404

@@ -11,10 +11,10 @@
 ![HAproxy](https://img.shields.io/badge/HAproxy-24A1C1?logo=haproxy&logoColor=fff&style=for-the-badge)
 ![Keepalived](https://img.shields.io/badge/Keepalived-AC6199?logo=keepalived&logoColor=fff&style=for-the-badge)
 
-Ansible role that installs and configures **HAProxy** and **Keepalived** for high availability load balancing. Works with any backend — web apps, APIs, databases, Kubernetes, and more.
+Ansible role that installs and configures **HAProxy** and **Keepalived** for high availability load balancing. Works with any backend - web apps, APIs, databases, Kubernetes, and more.
 
-- **HAProxy** — high-performance TCP/HTTP load balancer with health checks, SSL termination, and a built-in stats page.
-- **Keepalived** — VRRP-based floating VIP that automatically shifts to a backup node when the master fails.
+- **HAProxy** - high-performance TCP/HTTP load balancer with health checks, SSL termination, and a built-in stats page.
+- **Keepalived** - VRRP-based floating VIP that automatically shifts to a backup node when the master fails.
 
 **Official docs:** [HAProxy](https://www.haproxy.com/documentation/haproxy-configuration-manual/latest/) · [Keepalived](https://keepalived.readthedocs.io/en/latest/)
 
@@ -74,7 +74,7 @@ Or pin a version via `requirements.yml` (git source):
 roles:
   - name: devopsgroupeu.haproxy-keepalived
     src: https://github.com/devopsgroupeu/ansible-role-haproxy-keepalived
-    version: "v1.0.0"
+    version: "v1.2.0"
     scm: git
 ```
 
@@ -159,7 +159,7 @@ ansible-playbook -i examples/inventory/proxy_hosts.yml playbook.yml
 | Service | URL |
 |---------|-----|
 | Application | `http://10.0.0.100` |
-| HAProxy Stats | `http://10.0.0.100:1936/haproxy/stats` |
+| HAProxy Stats | `http://127.0.0.1:1936/haproxy/stats` on each node (`haproxy_stats_bind_addr` is loopback by default) |
 
 ---
 
@@ -170,12 +170,12 @@ graph TD
     Client(["Client"])
     VIP["Virtual IP (VIP)\nfloating address"]
 
-    subgraph proxy-01 ["proxy-01 — MASTER"]
+    subgraph proxy-01 ["proxy-01 - MASTER"]
         H1["HAProxy"]
         K1["Keepalived VRRP"]
     end
 
-    subgraph proxy-02 ["proxy-02 — BACKUP"]
+    subgraph proxy-02 ["proxy-02 - BACKUP"]
         H2["HAProxy"]
         K2["Keepalived VRRP"]
     end
@@ -193,7 +193,7 @@ graph TD
     K1 <-->|"VRRP unicast"| K2
 ```
 
-> Full diagrams — failover sequence, cloud floating IP flow, request path, task execution order: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+> Full diagrams - failover sequence, cloud floating IP flow, request path, task execution order: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 ### How failover works
 
@@ -206,7 +206,7 @@ Override with `keepalived_haproxy_check_script` if your systemd binary is elsewh
 - **HAProxy dies on the master:** after `fall 2` consecutive failures the
   track script fails, the master's `vrrp_instance` enters **FAULT** and
   releases the VIP. The backup, seeing no higher-priority advertisement,
-  transitions to **MASTER** and brings up the VIP — typically within
+  transitions to **MASTER** and brings up the VIP - typically within
   `interval × fall` (≈4s) plus one VRRP advert interval.
 - **HAProxy recovers:** after `rise 2` successes the node leaves FAULT. With
   default preempt, the original master (priority 100) reclaims the VIP.
@@ -225,12 +225,18 @@ The role identifies the master and backup nodes by hostname using `haproxy_loadb
 
 ## Variables
 
+The tables below cover the common variables. The full reference, including
+source builds, TLS, listen sections, VRRP tuning and directories, is in
+[docs/CONFIGURATION.md](docs/CONFIGURATION.md).
+
 ### Core
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `haproxy_enabled` | `true` | Install and configure HAProxy |
 | `haproxy_version` | `3.4.8` | HAProxy source version (source mode only; LTS even branch) |
+| `haproxy_install_method` | `package` | `package` (distro or branch repo) or `source` (compile) |
+| `haproxy_branch` | `""` | Package mode: install `haproxy=<branch>.*` from the upstream branch repo. Ubuntu 24.04: `3.0`, `3.2`; Debian 12: `3.0`, `3.2`; Debian 13: `3.2`, `3.4`; not on EL9 |
 | `haproxy_loadbalancer_master` | `""` | Hostname of the master proxy node (required with Keepalived) |
 | `haproxy_loadbalancer_backup` | `""` | Hostname of the backup proxy node (required with Keepalived) |
 | `haproxy_mode` | `http` | Default proxy mode: `http` or `tcp` |
@@ -242,9 +248,9 @@ The role identifies the master and backup nodes by hostname using `haproxy_loadb
 | `haproxy_timeout_check` | `10s` | Health check timeout |
 | `haproxy_stats` | `true` | Enable the HAProxy statistics page |
 | `haproxy_stats_port` | `1936` | Statistics page port |
-| `haproxy_stats_bind_addr` | `127.0.0.1` | Statistics page bind address — loopback by default |
+| `haproxy_stats_bind_addr` | `127.0.0.1` | Statistics page bind address - loopback by default |
 | `haproxy_stats_page_user` | `admin` | Statistics page username |
-| `haproxy_stats_page_pass` | — | Statistics page password (use Vault) |
+| `haproxy_stats_page_pass` | - | Statistics page password (use Vault) |
 | `haproxy_stats_page_uri` | `/haproxy/stats` | Statistics page URI |
 | `haproxy_config_change_action` | `restarted` | How a config or certificate change is applied: `restarted` or `reloaded` (seamless; used once the running config is role-managed) |
 
@@ -314,7 +320,12 @@ keepalived_vrrp_instances:
     virtual_router_id: 51            # 1-255, must be unique per VRRP cluster
 ```
 
-Multiple VIPs are supported — add more items to `keepalived_vrrp_instances`.
+Multiple VIPs are supported - add more items to `keepalived_vrrp_instances`.
+VIPs must be IPv4 (IPv6 VIPs are not supported by this role).
+
+> Unicast VRRP (the default) is not authenticated unless `keepalived_auth_type`
+> is set, and `PASS` is cleartext. Firewall VRRP (IP protocol 112) so the
+> proxies accept it only from the peer addresses.
 
 ### Cloud Floating IP
 
@@ -324,7 +335,7 @@ runs a notify script that reassigns the floating IP via the provider's API.
 
 > The bundled notify script targets the Hetzner Cloud v1 API. For other
 > providers, point `cloud_api_endpoint` at your API and supply a matching notify
-> script — the wiring into Keepalived is identical.
+> script - the wiring into Keepalived is identical.
 
 ```yaml
 cloud_floating_ip_enabled: true
@@ -340,7 +351,7 @@ script which reassigns the floating IP to the new master.
 
 ## Backend Server Specification
 
-Three methods are supported — choose based on your setup:
+Three methods are supported - choose based on your setup:
 
 ### 1. Inventory group (recommended)
 
@@ -379,25 +390,36 @@ servers:
 
 ```
 ansible-role-haproxy-keepalived/
-├── defaults/
-│   └── main.yml                        # All default variables
-├── files/
-│   └── certs/                          # SSL certificate storage
-├── handlers/
-│   └── main.yml                        # Reload HAProxy / Keepalived
-├── tasks/
-│   ├── main.yml                        # Entry point
-│   ├── setup.yml                       # Package installation
-│   ├── validate.yml                    # Input validation
-│   ├── haproxy.yml                     # HAProxy config + service
-│   ├── keepalived.yml                  # Keepalived config + service
-│   └── cloud_floating_ip.yml           # Cloud floating IP notify script
-├── templates/
-│   ├── haproxy.cfg.j2                  # HAProxy configuration
-│   ├── keepalived.conf.j2              # Keepalived configuration
-│   └── cloud-floating-ip-notify.sh.j2 # Failover notify script
-└── meta/
-    └── main.yml                        # Galaxy metadata
+|-- defaults/
+|   `-- main.yml                         # All default variables
+|-- files/
+|   `-- certs/                           # SSL certificate storage
+|-- handlers/
+|   `-- main.yml                         # Restart/reload handlers, backup cleanup
+|-- meta/
+|   |-- argument_specs.yml               # Variable types and defaults (validated)
+|   `-- main.yml                         # Galaxy metadata
+|-- tasks/
+|   |-- main.yml                         # Entry point
+|   |-- validate.yml                     # Input validation
+|   |-- setup.yml                        # Prerequisites, user, sysctl, SELinux
+|   |-- haproxy.yml                      # HAProxy config + service
+|   |-- haproxy_install_package.yml      # HAProxy from distro or branch repo
+|   |-- haproxy_install_source.yml       # HAProxy compiled from source
+|   |-- keepalived.yml                   # Keepalived config + service
+|   |-- keepalived_install_package.yml   # Keepalived from the distro
+|   |-- keepalived_install_source.yml    # Keepalived compiled from source
+|   |-- cloud_floating_ip.yml            # Cloud floating IP notify script
+|   `-- logrotate.yml                    # Rotation of role-managed logs
+`-- templates/
+    |-- haproxy.cfg.j2                   # HAProxy configuration
+    |-- keepalived.conf.j2               # Keepalived configuration
+    |-- cloud-floating-ip-notify.sh.j2   # Failover notify script
+    |-- haproxy-tmpfiles.conf.j2         # Runtime directories at boot
+    |-- haproxy-rsyslog.conf.j2          # rsyslog UDP receiver for HAProxy
+    |-- haproxy-debian-pin.pref.j2       # apt pin for the Debian branch repo
+    |-- keepalived.service.d-override.conf.j2  # Keepalived unit drop-in
+    `-- haproxy-keepalived-logrotate.j2  # logrotate rules
 ```
 
 ---
@@ -420,8 +442,8 @@ ip addr show | grep <vip-address>
 # Live HAProxy logs
 journalctl -u haproxy -f
 
-# Stats page (requires credentials)
-curl -u admin:<password> http://<vip>:1936/haproxy/stats
+# Stats page (requires credentials; loopback-bound by default, run on the node)
+curl -u admin:<password> http://127.0.0.1:1936/haproxy/stats
 ```
 
 ---

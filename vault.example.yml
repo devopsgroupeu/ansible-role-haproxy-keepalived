@@ -13,7 +13,7 @@
 # ============================================================================
 
 # HAProxy Stats Page Password
-vault_haproxy_stats_password: "your-secure-stats-password-here"
+vault_haproxy_stats_pass: "your-secure-stats-password-here"
 
 # SSL Certificate Passwords (if using encrypted certificates)
 vault_ssl_cert_password: "your-ssl-cert-password-here"

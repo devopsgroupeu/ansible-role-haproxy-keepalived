@@ -136,7 +136,7 @@ keepalived_vrrp_instances:
     virtual_ipaddress: "10.0.1.100"  # Your Virtual IP address
     virtual_router_id: 100            # Must be unique per VRRP cluster
 
-# Directory configurations (defaults — override if needed)
+# Directory configurations (defaults - override if needed)
 haproxy_install_dir: /usr/local/src
 haproxy_socket_dir: /var/lib/haproxy
 haproxy_config_dir: /etc/haproxy
