@@ -55,12 +55,14 @@
 
 # A reload is only safe over a config this role wrote: the package-started
 # stock process is always restarted (see "Apply HAProxy configuration change").
+# Matches the fixed marker line of templates/haproxy.cfg.j2, not ansible_managed
+# (its config setting is deprecated, and a customised value renders expanded).
 - name: Check whether the deployed HAProxy config is role-managed
   ansible.builtin.command:
     argv:
       - grep
-      - -qF
-      - "{{ lookup('ansible.builtin.config', 'DEFAULT_MANAGED_STR') }}"
+      - -qxF
+      - "# managed-by: devopsgroupeu.haproxy_keepalived"
       - "{{ haproxy_config_dir }}/haproxy.cfg"
   register: haproxy_config_managed
   changed_when: false
