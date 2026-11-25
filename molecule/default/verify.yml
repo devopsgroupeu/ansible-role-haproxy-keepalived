@@ -383,15 +383,21 @@
         fail_msg: "keepalived log facility not set via systemd drop-in"
         success_msg: "keepalived facility set via drop-in; no stray daemon"
 
-    - name: Assert Reload handlers are defined in the role
-      ansible.builtin.command: >-
-        grep -q "Reload keepalived" {{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/handlers/main.yml
-      delegate_to: localhost
-      become: false
-      run_once: true
+    # The running HAProxy must serve the role's config, not the stock one a
+    # package install started (a lost or deferred apply leaves no role
+    # listeners).
+    - name: Read listening TCP sockets
+      ansible.builtin.command: ss -Hltn
+      register: hkv_listen
       changed_when: false
-      register: reload_handler_grep
-      failed_when: reload_handler_grep.rc != 0
+
+    - name: Every role frontend, listen and stats port is listening
+      ansible.builtin.assert:
+        that:
+          - hkv_listen.stdout_lines | select('search', ':' ~ item ~ '\\s') | list | length > 0
+        fail_msg: "Nothing listens on port {{ item }}: {{ hkv_listen.stdout_lines }}"
+        success_msg: "Port {{ item }} is listening"
+      loop: "{{ haproxy_frontends | map(attribute='port') | list + haproxy_listens | map(attribute='port') | list + [1936] }}"
 
     - name: Read HAProxy rsyslog config
       ansible.builtin.slurp:
@@ -568,31 +574,37 @@
         fail_msg: "logrotate -d output: {{ hkv_logrotate.stderr_lines }}"
         success_msg: "Role-managed log files are rotated"
 
-- name: Verify VIP assignment on master
-  hosts: proxy-master
+# Every configured VIP must be held by exactly one load balancer, compared as
+# exact addresses (with nopreempt either node may be the holder).
+- name: Verify VIP assignment
+  hosts: proxy_hosts
   become: true
+  gather_facts: false
+  vars:
+    hkv_vips: >-
+      {{ keepalived_vrrp_instances | map(attribute='virtual_ipaddress')
+         | map('regex_replace', '/.*$', '') | list }}
   tasks:
-    - name: Wait for VIP to be assigned
-      ansible.builtin.wait_for:
-        timeout: 10
-      delegate_to: localhost
-      become: false
-      # nopreempt: VIP will be claimed by whichever node wins election; skip assertion
-      when: not (keepalived_nopreempt | default(false) | bool)
-
-    - name: Check if VIP is assigned
-      ansible.builtin.command: ip addr show
-      register: ip_check
+    - name: Read interface addresses
+      ansible.builtin.command: ip -o addr show
+      register: hkv_addr
       changed_when: false
-      when: not (keepalived_nopreempt | default(false) | bool)
 
-    - name: Verify VIP is present on master
+    - name: Collect the VIPs held by this node
+      ansible.builtin.set_fact:
+        hkv_held_vips: >-
+          {{ hkv_addr.stdout | regex_findall('inet ([0-9.]+)/') | intersect(hkv_vips) }}
+
+    - name: Each VIP is on exactly one node
+      vars:
+        hkv_all_held: >-
+          {{ ansible_play_hosts | map('extract', hostvars, 'hkv_held_vips') | flatten }}
       ansible.builtin.assert:
         that:
-          - "'172.18.0.100' in ip_check.stdout"
-        fail_msg: "Virtual IP not found on master node"
-        success_msg: "Virtual IP is assigned to master node"
-      when: not (keepalived_nopreempt | default(false) | bool)
+          - hkv_all_held | sort == hkv_vips | sort
+        fail_msg: "VIPs {{ hkv_vips }} held as {{ ansible_play_hosts | zip(ansible_play_hosts | map('extract', hostvars, 'hkv_held_vips')) | list }}"
+        success_msg: "Each VIP is held by exactly one node"
+      run_once: true
 
 - name: Verify validate.yml rejects invalid VRRP settings
   hosts: proxy-master

@@ -21,6 +21,22 @@
         fail_msg: "Package-mode services not running"
         success_msg: "Package-mode HAProxy + Keepalived running"
 
+    # The running HAProxy must serve the role's config, not the stock one a
+    # package install started (a lost or deferred apply leaves no role
+    # listeners).
+    - name: Read listening TCP sockets
+      ansible.builtin.command: ss -Hltn
+      register: hkv_listen
+      changed_when: false
+
+    - name: Every role frontend, listen and stats port is listening
+      ansible.builtin.assert:
+        that:
+          - hkv_listen.stdout_lines | select('search', ':' ~ item ~ '\\s') | list | length > 0
+        fail_msg: "Nothing listens on port {{ item }}: {{ hkv_listen.stdout_lines }}"
+        success_msg: "Port {{ item }} is listening"
+      loop: "{{ haproxy_frontends | map(attribute='port') | list + [1936] }}"
+
     # The geerlingguy test image ships with gcc pre-installed.
     # We check for source-specific build deps (liblua5.4-dev, libpcre2-dev)
     # that the role installs only in source mode - those prove no source path leaked.
@@ -94,3 +110,43 @@
         fail_msg: "SELinux tasks ran although SELinux is not enabled"
         success_msg: "SELinux tasks skipped (SELinux not enabled)"
       when: ansible_facts['os_family'] == 'RedHat'
+
+# Every configured VIP must be held by exactly one load balancer, compared as
+# exact addresses (preemption is on, so the master is the holder).
+- name: Verify VIP assignment
+  hosts: proxy_hosts
+  become: true
+  gather_facts: false
+  vars:
+    hkv_vips: >-
+      {{ keepalived_vrrp_instances | map(attribute='virtual_ipaddress')
+         | map('regex_replace', '/.*$', '') | list }}
+  tasks:
+    - name: Read interface addresses
+      ansible.builtin.command: ip -o addr show
+      register: hkv_addr
+      changed_when: false
+
+    - name: Collect the VIPs held by this node
+      ansible.builtin.set_fact:
+        hkv_held_vips: >-
+          {{ hkv_addr.stdout | regex_findall('inet ([0-9.]+)/') | intersect(hkv_vips) }}
+
+    - name: Each VIP is on exactly one node
+      vars:
+        hkv_all_held: >-
+          {{ ansible_play_hosts | map('extract', hostvars, 'hkv_held_vips') | flatten }}
+      ansible.builtin.assert:
+        that:
+          - hkv_all_held | sort == hkv_vips | sort
+        fail_msg: "VIPs {{ hkv_vips }} held as {{ ansible_play_hosts | zip(ansible_play_hosts | map('extract', hostvars, 'hkv_held_vips')) | list }}"
+        success_msg: "Each VIP is held by exactly one node"
+      run_once: true
+
+    - name: The master holds every VIP
+      ansible.builtin.assert:
+        that:
+          - hkv_held_vips | sort == hkv_vips | sort
+        fail_msg: "Master holds {{ hkv_held_vips }}, expected {{ hkv_vips }}"
+        success_msg: "Master holds every VIP"
+      when: inventory_hostname == haproxy_loadbalancer_master
