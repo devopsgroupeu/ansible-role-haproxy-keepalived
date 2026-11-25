@@ -108,11 +108,18 @@
   register: keepalived_service_status
   failed_when: keepalived_service_status.status.ActiveState != 'active'
 
+# Skipped with nopreempt or any preempt_delay: both nodes then start as BACKUP,
+# so the first node up may hold a VIP and the master only takes it over after
+# the delay (or never), longer than this check waits.
 - name: Check VIP assignment on master node
   when:
     - keepalived_enabled | bool
     - inventory_hostname == haproxy_loadbalancer_master
     - not (keepalived_nopreempt | bool)
+    - >-
+      keepalived_vrrp_instances
+      | map(attribute='preempt_delay', default=keepalived_preempt_delay)
+      | map('int') | select('gt', 0) | list | length == 0
   ansible.builtin.command: ip addr show
   register: vip_check
   changed_when: false

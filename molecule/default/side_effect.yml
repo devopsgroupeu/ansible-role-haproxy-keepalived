@@ -23,23 +23,23 @@
   gather_facts: true
   vars:
     hkv_rotated_stats_pass: "rotated_password_654321"
+    hkv_moved_vips: &hkv_moved_vips
+      - vrrp_instance_name: VI_TEST
+        virtual_ipaddress: "172.18.0.110"
+        virtual_router_id: 51
+      - vrrp_instance_name: VI_TEST2
+        virtual_ipaddress: "172.18.0.101"
+        virtual_router_id: 52
   tasks:
-    # Preemption (with a delay) is enabled for this run so the role's own VIP
-    # check runs on the master against the moved VIP.
+    # Preemption is enabled for this run so the role's own VIP check runs on
+    # the master against the moved VIP.
     - name: Re-apply the role with a rotated stats password and a moved VIP
       ansible.builtin.include_role:
         name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}"
       vars:
         haproxy_stats_page_pass: "{{ hkv_rotated_stats_pass }}"
         keepalived_nopreempt: false
-        keepalived_preempt_delay: 5
-        keepalived_vrrp_instances:
-          - vrrp_instance_name: VI_TEST
-            virtual_ipaddress: "172.18.0.110"
-            virtual_router_id: 51
-          - vrrp_instance_name: VI_TEST2
-            virtual_ipaddress: "172.18.0.101"
-            virtual_router_id: 52
+        keepalived_vrrp_instances: *hkv_moved_vips
 
     - name: Stats page accepts the rotated password
       ansible.builtin.uri:
@@ -56,24 +56,6 @@
         password: "{{ haproxy_stats_page_pass }}"
         force_basic_auth: true
         status_code: 401
-
-    - name: Read keepalived.conf rendered with preempt_delay
-      ansible.builtin.slurp:
-        src: /etc/keepalived/keepalived.conf
-      register: hkv_ka_preempt
-
-    - name: Assert preempt_delay renders with initial state BACKUP
-      ansible.builtin.assert:
-        that:
-          - "'preempt_delay 5' in (hkv_ka_preempt.content | b64decode)"
-          - "'state MASTER' not in (hkv_ka_preempt.content | b64decode)"
-          - "'nopreempt' not in (hkv_ka_preempt.content | b64decode)"
-        fail_msg: "preempt_delay must be rendered with state BACKUP (keepalived rejects it on MASTER)"
-        success_msg: "preempt_delay rendered with initial state BACKUP"
-
-    - name: Validate the preempt_delay config with keepalived
-      ansible.builtin.command: keepalived -t -f /etc/keepalived/keepalived.conf
-      changed_when: false
 
     - name: Read interface addresses after the VIP change
       ansible.builtin.command: ip -o addr show
@@ -100,6 +82,79 @@
         success_msg: "Backup holds no VIP"
       when: inventory_hostname == haproxy_loadbalancer_backup
 
+    - name: Stop Keepalived for a fresh start with a preemption delay
+      ansible.builtin.systemd_service:
+        name: keepalived
+        state: stopped
+
+# Fresh start with a preemption delay longer than the role's VIP check window:
+# the backup starts first and takes the VIPs, the master then holds off for 60s.
+# Both runs must pass.
+- name: Start the backup first with a preemption delay
+  hosts: proxy-backup
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Apply the role on the backup with preempt_delay 60
+      ansible.builtin.include_role:
+        name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}"
+      vars:
+        keepalived_nopreempt: false
+        keepalived_preempt_delay: 60
+        keepalived_vrrp_instances: *hkv_moved_vips
+
+    - name: Backup takes the VIPs while it is alone
+      ansible.builtin.command: ip -o addr show
+      register: hkv_addr_alone
+      changed_when: false
+      until: "'172.18.0.110' in hkv_addr_alone.stdout | regex_findall('inet ([0-9.]+)/')"
+      retries: 15
+      delay: 2
+
+- name: Start the master with a preemption delay
+  hosts: proxy-master
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Apply the role on the master with preempt_delay 60
+      ansible.builtin.include_role:
+        name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}"
+      vars:
+        keepalived_nopreempt: false
+        keepalived_preempt_delay: 60
+        keepalived_vrrp_instances: *hkv_moved_vips
+
+    - name: Read keepalived.conf rendered with preempt_delay
+      ansible.builtin.slurp:
+        src: /etc/keepalived/keepalived.conf
+      register: hkv_ka_preempt
+
+    - name: Assert preempt_delay renders with initial state BACKUP
+      ansible.builtin.assert:
+        that:
+          - "'preempt_delay 60' in (hkv_ka_preempt.content | b64decode)"
+          - "'state MASTER' not in (hkv_ka_preempt.content | b64decode)"
+          - "'nopreempt' not in (hkv_ka_preempt.content | b64decode)"
+        fail_msg: "preempt_delay must be rendered with state BACKUP (keepalived rejects it on MASTER)"
+        success_msg: "preempt_delay rendered with initial state BACKUP"
+
+    - name: Validate the preempt_delay config with keepalived
+      ansible.builtin.command: keepalived -t -f /etc/keepalived/keepalived.conf
+      changed_when: false
+
+    - name: Read the master's interface addresses during the preemption delay
+      ansible.builtin.command: ip -o addr show
+      register: hkv_addr_delayed
+      changed_when: false
+
+    - name: Master holds off while the backup keeps the VIPs
+      ansible.builtin.assert:
+        that:
+          - "'172.18.0.110' not in hkv_addr_delayed.stdout | regex_findall('inet ([0-9.]+)/')"
+          - "'172.18.0.101' not in hkv_addr_delayed.stdout | regex_findall('inet ([0-9.]+)/')"
+        fail_msg: "Master took the VIPs before preempt_delay expired: {{ hkv_addr_delayed.stdout_lines }}"
+        success_msg: "Master waits out preempt_delay; the role did not fail on it"
+
 - name: Restore the fixture configuration
   hosts: proxy_hosts
   become: true
@@ -117,16 +172,29 @@
         force_basic_auth: true
         status_code: 200
 
-    - name: Master carries the fixture VIPs again
+    # The moved VIP is gone everywhere; with nopreempt either node may hold
+    # the fixture VIPs.
+    - name: Read interface addresses after the restore
       ansible.builtin.command: ip -o addr show
       register: hkv_addr_restored
       changed_when: false
-      until: >-
-        '172.18.0.100' in hkv_addr_restored.stdout | regex_findall('inet ([0-9.]+)/')
-        and '172.18.0.110' not in hkv_addr_restored.stdout | regex_findall('inet ([0-9.]+)/')
+      until: "'172.18.0.110' not in hkv_addr_restored.stdout | regex_findall('inet ([0-9.]+)/')"
       retries: 10
       delay: 2
-      when: inventory_hostname == haproxy_loadbalancer_master
+
+    - name: Each fixture VIP is on exactly one node again
+      vars:
+        hkv_all_restored: >-
+          {{ ansible_play_hosts
+             | map('extract', hostvars, ['hkv_addr_restored', 'stdout'])
+             | map('regex_findall', 'inet ([0-9.]+)/')
+             | map('intersect', ['172.18.0.100', '172.18.0.101']) | flatten }}
+      ansible.builtin.assert:
+        that:
+          - hkv_all_restored | sort == ['172.18.0.100', '172.18.0.101']
+        fail_msg: "Fixture VIPs not held exactly once: {{ hkv_all_restored }}"
+        success_msg: "Fixture VIPs restored on one node"
+      run_once: true
 
 # A node with every component disabled must not get the HAProxy user, the
 # Keepalived sysctl or rsyslog from the setup tasks.
