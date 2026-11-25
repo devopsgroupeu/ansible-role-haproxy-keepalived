@@ -81,5 +81,7 @@ scenario:
     - prepare
     - converge
     - idempotence
+    # --check on a converged pair with preemption on (the master VIP check)
+    - check
     - verify
     - destroy

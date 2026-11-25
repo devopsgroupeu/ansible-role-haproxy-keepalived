@@ -110,10 +110,13 @@
 
 # Skipped with nopreempt or any preempt_delay: both nodes then start as BACKUP,
 # so the first node up may hold a VIP and the master only takes it over after
-# the delay (or never), longer than this check waits.
+# the delay (or never), longer than this check waits. Skipped in check mode,
+# where a pending VIP change is not applied (and until would retry on the
+# skipped command's empty output).
 - name: Check VIP assignment on master node
   when:
     - keepalived_enabled | bool
+    - not ansible_check_mode
     - inventory_hostname == haproxy_loadbalancer_master
     - not (keepalived_nopreempt | bool)
     - >-
