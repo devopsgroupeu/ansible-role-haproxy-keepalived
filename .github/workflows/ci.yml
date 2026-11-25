@@ -121,6 +121,41 @@ jobs:
           PY_COLORS: "1"
           ANSIBLE_FORCE_COLOR: "1"
 
+  # The molecule job above runs whatever ansible-core requirements.txt resolves
+  # to; this one runs the default scenario on the oldest and newest admitted
+  # lines (meta/main.yml min_ansible_version and the requirements.txt cap).
+  molecule-ansible-core:
+    name: molecule (debian13 / default / ansible-core ${{ matrix.ansible-core }})
+    runs-on: ubuntu-latest
+    needs: [lint]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - ansible-core: "2.19"
+            python: "3.12"
+          - ansible-core: "2.22"
+            python: "3.13"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+
+      - name: Install test dependencies
+        run: pip install -r requirements.txt "ansible-core==${{ matrix.ansible-core }}.*"
+
+      - name: Run molecule
+        run: molecule test -s default
+        env:
+          MOLECULE_DISTRO: debian13
+          PY_COLORS: "1"
+          ANSIBLE_FORCE_COLOR: "1"
+
   # Real VRRP VIP migration between two containers. Election timing on shared
   # CI runners is less reliable, so this runs on demand and weekly instead of
   # gating pull requests.
@@ -158,7 +193,7 @@ jobs:
   ci-success:
     name: ci-success
     runs-on: ubuntu-latest
-    needs: [lint, molecule]
+    needs: [lint, molecule, molecule-ansible-core]
     if: always()
     steps:
       - name: Fail if any required job did not succeed
