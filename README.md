@@ -54,7 +54,7 @@ Ansible role that installs and configures **HAProxy** and **Keepalived** for hig
   to `false` to manage the SELinux policy yourself.
 
 **Version policy:** in source mode the role tracks HAProxy **LTS** branches
-(even-numbered: 3.0/3.2/3.4). The default is the newest LTS (`3.4.1`). In
+(even-numbered: 3.0/3.2/3.4). The default is the newest LTS (`3.4.8`). In
 package mode the version follows the distribution / configured repo.
 
 ---
@@ -230,7 +230,7 @@ The role identifies the master and backup nodes by hostname using `haproxy_loadb
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `haproxy_enabled` | `true` | Install and configure HAProxy |
-| `haproxy_version` | `3.4.0` | HAProxy source version (source mode only; LTS even branch) |
+| `haproxy_version` | `3.4.8` | HAProxy source version (source mode only; LTS even branch) |
 | `haproxy_loadbalancer_master` | — | Hostname of the master proxy node |
 | `haproxy_loadbalancer_backup` | — | Hostname of the backup proxy node |
 | `haproxy_mode` | `http` | Default proxy mode: `http` or `tcp` |
@@ -281,7 +281,7 @@ haproxy_backends:
 
 ```yaml
 keepalived_enabled: true
-keepalived_version: 2.3.4
+keepalived_version: 2.4.3
 keepalived_network_interface: eth0   # Interface to bind the VIP to
 
 keepalived_vrrp_instances:

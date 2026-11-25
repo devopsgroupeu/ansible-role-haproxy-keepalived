@@ -24,7 +24,7 @@ haproxy_loadbalancer_backup: "proxy-02"  # Change to your backup server name
 # HAProxy Configuration
 # ============================================================================
 haproxy_enabled: true
-haproxy_version: 3.4.0
+haproxy_version: "3.4.8"
 
 # HAProxy user and group
 haproxy_user: haproxy
@@ -83,7 +83,7 @@ haproxy_backends:
 # Keepalived Configuration
 # ============================================================================
 keepalived_enabled: true
-keepalived_version: "2.3.4"
+keepalived_version: "2.4.3"
 
 # Network interface for VRRP (check with 'ip a' on your servers)
 # Cloud Provider typically uses: ens3

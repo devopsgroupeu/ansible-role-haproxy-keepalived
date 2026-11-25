@@ -256,14 +256,14 @@ the Ansible controller and point the role at it with the offline variables:
 
 ```bash
 # On an internet-connected machine
-wget https://www.haproxy.org/download/3.4/src/haproxy-3.4.0.tar.gz
+wget https://www.haproxy.org/download/3.4/src/haproxy-3.4.8.tar.gz
 ```
 
 ```yaml
 # group_vars or host_vars
 haproxy_install_method: source
 haproxy_offline_install: true
-haproxy_src_local_path: "/path/on/controller/haproxy-3.4.0.tar.gz"
+haproxy_src_local_path: "/path/on/controller/haproxy-3.4.8.tar.gz"
 ```
 
 The role copies the tarball from the controller path to `haproxy_install_dir` on

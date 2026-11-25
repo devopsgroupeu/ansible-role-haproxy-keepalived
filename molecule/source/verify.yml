@@ -13,9 +13,9 @@
     - name: Assert HAProxy was compiled to the pinned version
       ansible.builtin.assert:
         that:
-          - "'3.4.1' in hap_v.stdout"
-        fail_msg: "Source-built HAProxy is not version 3.4.1: {{ hap_v.stdout }}"
-        success_msg: "HAProxy 3.4.1 compiled and installed from source"
+          - "'3.4.8' in hap_v.stdout"
+        fail_msg: "Source-built HAProxy is not version 3.4.8: {{ hap_v.stdout }}"
+        success_msg: "HAProxy 3.4.8 compiled and installed from source"
 
     - name: Get Keepalived version from the source-built binary
       ansible.builtin.command: /usr/local/sbin/keepalived --version
@@ -26,9 +26,9 @@
     - name: Assert Keepalived was compiled to the pinned version
       ansible.builtin.assert:
         that:
-          - "'2.4.1' in (ka_v.stderr ~ ka_v.stdout)"
-        fail_msg: "Source-built Keepalived is not version 2.4.1: {{ ka_v.stderr }}"
-        success_msg: "Keepalived 2.4.1 compiled and installed from source"
+          - "'2.4.3' in (ka_v.stderr ~ ka_v.stdout)"
+        fail_msg: "Source-built Keepalived is not version 2.4.3: {{ ka_v.stderr }}"
+        success_msg: "Keepalived 2.4.3 compiled and installed from source"
 
     - name: Gather service facts
       ansible.builtin.service_facts:

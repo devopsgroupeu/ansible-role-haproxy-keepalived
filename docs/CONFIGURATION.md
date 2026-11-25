@@ -77,7 +77,7 @@ pairs, and EL9, fail in validation:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `haproxy_enabled` | `true` | Install and configure HAProxy |
-| `haproxy_version` | `3.4.0` | Version to install from source (LTS; package mode ignores this) |
+| `haproxy_version` | `3.4.8` | Version to install from source (LTS; package mode ignores this) |
 | `haproxy_config` | `""` | Full config as a string — bypasses all template generation |
 | `haproxy_user` | `haproxy` | System user for the HAProxy process |
 | `haproxy_group` | `haproxy` | System group for the HAProxy process |
@@ -312,7 +312,7 @@ verbatim — only validated by `haproxy -c`.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `keepalived_enabled` | `true` | Install and configure Keepalived |
-| `keepalived_version` | `2.3.4` | Version to install from source (package mode ignores this) |
+| `keepalived_version` | `2.4.3` | Version to install from source (package mode ignores this) |
 | `keepalived_network_interface` | `eth0` | Interface to bind VRRP to — run `ip link` to confirm |
 | `keepalived_unicast` | `true` | Use unicast instead of multicast (required for most cloud/VM environments) |
 | `keepalived_peer_group` | `proxy_hosts` | Inventory group used for automatic unicast peer discovery |

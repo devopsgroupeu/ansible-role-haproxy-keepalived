@@ -11,7 +11,7 @@ haproxy_config: ""
 
 # HAProxy and Keepalived enable flags
 haproxy_enabled: true
-haproxy_version: 3.4.0
+haproxy_version: "3.4.8"
 
 # Load balancer node identification
 haproxy_loadbalancer_master: "proxy-master-hostname"
@@ -130,7 +130,7 @@ haproxy_listens: []
 # Keepalived configuration
 keepalived_enabled: true
 keepalived_network_interface: eth0  # Change to your network interface
-keepalived_version: "2.3.4"
+keepalived_version: "2.4.3"
 keepalived_vrrp_instances:
   - vrrp_instance_name: VI_1
     virtual_ipaddress: "10.0.1.100"  # Your Virtual IP address
