@@ -6,16 +6,20 @@
   ansible.builtin.systemd_service:
     daemon_reload: true
 
+# Restart handlers run on one host at a time, so both load balancers are never
+# down together.
 - name: Restart keepalived
   ansible.builtin.systemd_service:
     name: keepalived
     state: restarted
+  throttle: 1
   when: keepalived_enabled | bool
 
 - name: Restart haproxy
   ansible.builtin.systemd_service:
     name: haproxy
     state: restarted
+  throttle: 1
 
 # By basename, so the /etc/tmpfiles.d file is used as it is at boot.
 - name: Apply HAProxy tmpfiles rules

@@ -379,6 +379,16 @@ haproxy_errorfiles: []
 # Send HAProxy logs to journald instead of rsyslog UDP (uses /dev/log).
 haproxy_journald: false
 
+# How a config or certificate change is applied to a running HAProxy:
+#   restarted - full restart (closes established connections)
+#   reloaded  - seamless reload. Used only when the config being replaced was
+#               already written by this role; the first takeover of the
+#               package-started stock process, and a new source-built binary,
+#               always restart.
+# The apply step runs on one host at a time (throttle: 1); see README for
+# rolling a play with serial: 1.
+haproxy_config_change_action: restarted
+
 # ============================================================================
 # Keepalived Configuration
 # ============================================================================

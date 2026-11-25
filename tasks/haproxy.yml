@@ -53,6 +53,21 @@
     group: "{{ haproxy_group }}"
     mode: "0750"
 
+# A reload is only safe over a config this role wrote: the package-started
+# stock process is always restarted (see "Apply HAProxy configuration change").
+- name: Check whether the deployed HAProxy config is role-managed
+  ansible.builtin.command:
+    argv:
+      - grep
+      - -qF
+      - "{{ lookup('ansible.builtin.config', 'DEFAULT_MANAGED_STR') }}"
+      - "{{ haproxy_config_dir }}/haproxy.cfg"
+  register: haproxy_config_managed
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  when: haproxy_config_change_action == 'reloaded'
+
 - name: Copy HAProxy configuration
   ansible.builtin.template:
     src: haproxy.cfg.j2
@@ -98,15 +113,24 @@
     daemon_reload: true
   register: haproxy_service_start
 
-# Restart (not reload) on a config or certificate change: the package
+# Restart by default; reload only when haproxy_config_change_action is
+# reloaded and the replaced config was already role-managed. The package
 # auto-starts HAProxy on the default config, and a soft reload over that
-# process can leave the new frontends unbound (no listening sockets). Skipped when the task above just
-# started the service, because it already runs the new config and binary.
+# process can leave the new frontends unbound (no listening sockets); a new
+# source-built binary also restarts. Skipped when the task above just started
+# the service, because it already runs the new config and binary. One host at a
+# time, so both load balancers never drop connections in the same second.
 - name: Apply HAProxy configuration change
   ansible.builtin.systemd_service:
     name: haproxy
-    state: restarted
+    state: >-
+      {{ 'reloaded'
+         if haproxy_config_change_action == 'reloaded'
+            and (haproxy_config_managed.rc | default(1)) == 0
+            and not (haproxy_source_changed | default(false) | bool)
+         else 'restarted' }}
     daemon_reload: true
+  throttle: 1
   when:
     - >-
       haproxy_config_result is changed

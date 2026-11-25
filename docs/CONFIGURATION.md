@@ -108,6 +108,7 @@ haproxy_options:
 ```
 
 | `haproxy_journald` | `false` | Send HAProxy logs to journald via `/dev/log` instead of rsyslog UDP |
+| `haproxy_config_change_action` | `restarted` | `restarted` or `reloaded`: how a config or certificate change is applied, one host at a time. `reloaded` is used only when the replaced config was already role-managed; the stock-config takeover and a new source-built binary always restart |
 
 **Log files and rotation.** With rsyslog logging the role writes
 `/var/log/haproxy-traffic.log` and `/var/log/haproxy-admin.log`; with Keepalived

@@ -73,6 +73,7 @@
 # A unit drop-in change needs a restart; a config, notify script or credentials
 # change only needs a reload (keepalived reads notify scripts at exec time).
 # Skipped when the task above just started the service with the new files.
+# One host at a time, so master and backup never restart together.
 - name: Apply Keepalived configuration change
   when:
     - keepalived_enabled | bool
@@ -86,6 +87,7 @@
     name: keepalived
     daemon_reload: true
     state: "{{ 'restarted' if keepalived_dropin_result is changed else 'reloaded' }}"
+  throttle: 1
 
 - name: Wait for Keepalived to initialize
   when: keepalived_enabled | bool

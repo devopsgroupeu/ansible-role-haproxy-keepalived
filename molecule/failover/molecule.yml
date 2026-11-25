@@ -50,6 +50,9 @@ provisioner:
         haproxy_install_method: package
         keepalived_install_method: package
         haproxy_stats_page_pass: "test_password_123456"
+        # Seamless reload on config changes; verify.yml checks the master PID
+        # survives a change.
+        haproxy_config_change_action: reloaded
         keepalived_network_interface: eth0
         keepalived_nopreempt: true
         keepalived_vrrp_instances:

@@ -246,6 +246,30 @@ The role identifies the master and backup nodes by hostname using `haproxy_loadb
 | `haproxy_stats_page_user` | `admin` | Statistics page username |
 | `haproxy_stats_page_pass` | — | Statistics page password (use Vault) |
 | `haproxy_stats_page_uri` | `/haproxy/stats` | Statistics page URI |
+| `haproxy_config_change_action` | `restarted` | How a config or certificate change is applied: `restarted` or `reloaded` (seamless; used once the running config is role-managed) |
+
+**Applying changes.** A config or certificate change is applied in the same
+play, one host at a time (`throttle: 1` on the apply tasks and the restart
+handlers). The default `restarted` closes established connections; set
+`haproxy_config_change_action: reloaded` for a seamless reload. The first
+takeover of the package-started stock config and a new source-built binary are
+always a restart. To also keep checks and package upgrades from running on both
+load balancers at once, roll the play one node at a time. Unicast peer discovery
+and inventory-group backends read the other hosts' facts, so gather those first:
+
+```yaml
+- name: Gather facts for peer and backend discovery
+  hosts: proxy_hosts:app_servers
+  gather_facts: true
+  tasks: []
+
+- name: Deploy HAProxy + Keepalived
+  hosts: proxy_hosts
+  become: true
+  serial: 1
+  roles:
+    - role: devopsgroupeu.haproxy-keepalived
+```
 
 ### Frontends
 

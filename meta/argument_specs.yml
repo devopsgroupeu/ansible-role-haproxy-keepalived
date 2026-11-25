@@ -341,6 +341,15 @@ argument_specs:
         required: false
         default: false
         description: Drop the rsyslog UDP receiver and rely on journald.
+      haproxy_config_change_action:
+        type: str
+        required: false
+        default: restarted
+        choices: [restarted, reloaded]
+        description: >-
+          How a config or certificate change is applied to a running HAProxy. reloaded is used
+          only when the replaced config was already role-managed; the first takeover of the
+          stock config and a new source-built binary always restart.
       haproxy_config_dir:
         type: str
         required: false
