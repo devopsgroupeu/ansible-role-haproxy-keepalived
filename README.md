@@ -231,8 +231,8 @@ The role identifies the master and backup nodes by hostname using `haproxy_loadb
 |----------|---------|-------------|
 | `haproxy_enabled` | `true` | Install and configure HAProxy |
 | `haproxy_version` | `3.4.8` | HAProxy source version (source mode only; LTS even branch) |
-| `haproxy_loadbalancer_master` | — | Hostname of the master proxy node |
-| `haproxy_loadbalancer_backup` | — | Hostname of the backup proxy node |
+| `haproxy_loadbalancer_master` | `""` | Hostname of the master proxy node (required with Keepalived) |
+| `haproxy_loadbalancer_backup` | `""` | Hostname of the backup proxy node (required with Keepalived) |
 | `haproxy_mode` | `http` | Default proxy mode: `http` or `tcp` |
 | `haproxy_maxconn` | `3000` | Maximum simultaneous connections |
 | `haproxy_retries` | `3` | Connection retry attempts |

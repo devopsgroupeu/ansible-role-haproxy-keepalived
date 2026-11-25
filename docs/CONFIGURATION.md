@@ -28,8 +28,12 @@ Full variable reference for the HAProxy + Keepalived role. All variables are def
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `haproxy_loadbalancer_master` | `""` | `inventory_hostname` of the master proxy node. **Required.** |
-| `haproxy_loadbalancer_backup` | `""` | `inventory_hostname` of the backup proxy node. **Required.** |
+| `haproxy_loadbalancer_master` | `""` | `inventory_hostname` of the master proxy node. **Required when `keepalived_enabled`.** |
+| `haproxy_loadbalancer_backup` | `""` | `inventory_hostname` of the backup proxy node. **Required when `keepalived_enabled`.** |
+
+Setup steps follow the enabled components: the HAProxy user and group only with
+`haproxy_enabled`, the `ip_nonlocal_bind` sysctl only with `keepalived_enabled`,
+and rsyslog only when HAProxy logs via rsyslog or Keepalived is enabled.
 
 The master receives Keepalived priority 100, the backup receives 90. Both run HAProxy; only the master holds the VIP at any time.
 

@@ -1,11 +1,21 @@
 ---
+# rsyslog receives HAProxy's UDP syslog and Keepalived's facility; it is not
+# needed when HAProxy logs to journald and Keepalived is disabled.
+- name: Determine whether rsyslog is needed
+  ansible.builtin.set_fact:
+    haproxy_rsyslog_needed: >-
+      {{ (haproxy_enabled | bool and not haproxy_journald | bool)
+         or keepalived_enabled | bool }}
+
 - name: Create HAProxy group
   ansible.builtin.group:
     name: "{{ haproxy_group }}"
     system: true
     state: present
+  when: haproxy_enabled | bool
 
 - name: Create HAProxy user
+  when: haproxy_enabled | bool
   ansible.builtin.user:
     name: "{{ haproxy_user }}"
     group: "{{ haproxy_group }}"
@@ -26,7 +36,10 @@
 
 - name: Install runtime prerequisites on RHEL/CentOS/Rocky Linux
   ansible.builtin.package:
-    name: "{{ ([] if haproxy_curl_binary.stat.exists else ['curl']) + ['logrotate', 'python3', 'rsyslog'] }}"
+    name: >-
+      {{ ([] if haproxy_curl_binary.stat.exists else ['curl'])
+         + ['logrotate', 'python3']
+         + (['rsyslog'] if haproxy_rsyslog_needed | bool else []) }}
     state: present
   when:
     - ansible_facts['os_family'] == 'RedHat'
@@ -40,11 +53,7 @@
 
 - name: Install runtime prerequisites on Debian/Ubuntu
   ansible.builtin.package:
-    name:
-      - curl
-      - logrotate
-      - python3
-      - rsyslog
+    name: "{{ ['curl', 'logrotate', 'python3'] + (['rsyslog'] if haproxy_rsyslog_needed | bool else []) }}"
     state: present
   when:
     - ansible_facts['os_family'] == 'Debian'
@@ -71,6 +80,7 @@
         persistent: true
 
 - name: Enable non-local binding for the VIP
+  when: keepalived_enabled | bool
   ansible.posix.sysctl:
     name: net.ipv4.ip_nonlocal_bind
     value: "1"

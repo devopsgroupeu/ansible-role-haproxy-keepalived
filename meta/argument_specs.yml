@@ -12,12 +12,18 @@ argument_specs:
     options:
       haproxy_loadbalancer_master:
         type: str
-        required: true
-        description: inventory_hostname of the master proxy node.
+        required: false
+        default: ""
+        description: >
+          inventory_hostname of the master proxy node. Required (and validated)
+          when keepalived_enabled is true.
       haproxy_loadbalancer_backup:
         type: str
-        required: true
-        description: inventory_hostname of the backup proxy node.
+        required: false
+        default: ""
+        description: >
+          inventory_hostname of the backup proxy node. Required (and validated)
+          when keepalived_enabled is true.
       haproxy_enabled:
         type: bool
         required: false

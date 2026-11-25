@@ -127,3 +127,36 @@
       retries: 10
       delay: 2
       when: inventory_hostname == haproxy_loadbalancer_master
+
+# A node with every component disabled must not get the HAProxy user, the
+# Keepalived sysctl or rsyslog from the setup tasks.
+- name: Apply the role with all components disabled
+  hosts: backend_servers
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Apply the role with HAProxy and Keepalived disabled
+      ansible.builtin.include_role:
+        name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}"
+      vars:
+        haproxy_enabled: false
+        keepalived_enabled: false
+
+    - name: Look up the haproxy user
+      ansible.builtin.getent:
+        database: passwd
+        key: haproxy
+        fail_key: false
+
+    - name: Stat the Keepalived sysctl drop-in
+      ansible.builtin.stat:
+        path: /etc/sysctl.d/60-keepalived.conf
+      register: hkv_disabled_sysctl
+
+    - name: Assert setup skipped the disabled components
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['getent_passwd']['haproxy'] is none
+          - not hkv_disabled_sysctl.stat.exists
+        fail_msg: "Setup created the haproxy user or the keepalived sysctl on a node with both disabled"
+        success_msg: "No haproxy user and no keepalived sysctl with both components disabled"

@@ -6,7 +6,10 @@
 # proceeding with installation and configuration.
 # ============================================================================
 
+# Only Keepalived uses the master/backup names (priority, initial state, VIP
+# check), so HAProxy-only deployments do not need them.
 - name: Validate load balancer node identification
+  when: keepalived_enabled | bool
   ansible.builtin.assert:
     that:
       - haproxy_loadbalancer_master is defined
