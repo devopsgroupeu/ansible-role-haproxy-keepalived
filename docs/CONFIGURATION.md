@@ -396,6 +396,12 @@ cloud_api_token: "{{ vault_cloud_api_token }}"
 cloud_floating_ip_address: "95.217.1.100"
 ```
 
+On a MASTER transition the notify script retries the assign call up to 5 times
+(2 s apart) while the API answers `locked` (another action on the Floating IP is
+still running, e.g. the boot-time unit and `notify_master` racing). The token is
+read from the `0600` env file and handed to curl through a temporary `0600`
+header file, never on the command line.
+
 ---
 
 ## Directories

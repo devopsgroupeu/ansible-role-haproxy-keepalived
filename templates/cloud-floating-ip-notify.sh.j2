@@ -34,14 +34,22 @@ done
 : "${CLOUD_API_TOKEN:?CLOUD_API_TOKEN not set in $ENV_FILE}"
 : "${FLOATING_IP:?FLOATING_IP not set in $ENV_FILE}"
 
-CURL="curl -fsS --connect-timeout 5 --max-time 20 --retry 3 --retry-delay 2 --retry-connrefused"
+# The bearer token goes to curl through a 0600 header file (-H @file), so it
+# never appears on a command line (ps, /proc/<pid>/cmdline).
+HDR_FILE=$(mktemp)
+trap 'rm -f "$HDR_FILE"' EXIT
+chmod 0600 "$HDR_FILE"
+printf 'Authorization: Bearer %s\n' "$CLOUD_API_TOKEN" > "$HDR_FILE"
+
+CURL_BASE="curl -sS --connect-timeout 5 --max-time 20 --retry 3 --retry-delay 2 --retry-connrefused -H @$HDR_FILE"
+CURL="$CURL_BASE -f"
+ASSIGN_ATTEMPTS=5
 
 STATE="${1:-UNKNOWN}"
 log "Keepalived state transition: $STATE on server $SERVER_NAME"
 
 assign_floating_ip() {
-    SERVER_ID=$($CURL -H "Authorization: Bearer $CLOUD_API_TOKEN" \
-        "${API_ENDPOINT}/servers?name=${SERVER_NAME}" \
+    SERVER_ID=$($CURL "${API_ENDPOINT}/servers?name=${SERVER_NAME}" \
         | jq -r --arg n "$SERVER_NAME" '.servers[] | select(.name==$n) | .id' | head -1)
     if [ -z "$SERVER_ID" ] || [ "$SERVER_ID" = "null" ]; then
         log "ERROR: Could not find server ID for $SERVER_NAME"
@@ -49,8 +57,7 @@ assign_floating_ip() {
     fi
     log "Found server ID: $SERVER_ID"
 
-    FIP_ID=$($CURL -H "Authorization: Bearer $CLOUD_API_TOKEN" \
-        "${API_ENDPOINT}/floating_ips?ip=${FLOATING_IP}" \
+    FIP_ID=$($CURL "${API_ENDPOINT}/floating_ips?ip=${FLOATING_IP}" \
         | jq -r --arg ip "$FLOATING_IP" '.floating_ips[] | select(.ip==$ip) | .id' | head -1)
     if [ -z "$FIP_ID" ] || [ "$FIP_ID" = "null" ]; then
         log "ERROR: Could not find Floating IP ID for ${FLOATING_IP}"
@@ -58,20 +65,30 @@ assign_floating_ip() {
     fi
     log "Found Floating IP ID: $FIP_ID"
 
-    ASSIGN_RESPONSE=$($CURL -X POST \
-        -H "Authorization: Bearer $CLOUD_API_TOKEN" \
-        -H "Content-Type: application/json" \
-        -d "{\"server\": $SERVER_ID}" \
-        "${API_ENDPOINT}/floating_ips/${FIP_ID}/actions/assign" || true)
+    # --fail-with-body keeps the JSON error body of an HTTP >= 400 answer, so
+    # a "locked" Floating IP (another action still running, e.g. the boot-time
+    # unit racing notify_master) is retried instead of failing the transition.
+    attempt=1
+    while :; do
+        ASSIGN_RESPONSE=$($CURL_BASE --fail-with-body -X POST \
+            -H "Content-Type: application/json" \
+            -d "{\"server\": $SERVER_ID}" \
+            "${API_ENDPOINT}/floating_ips/${FIP_ID}/actions/assign" || true)
 
-    if echo "$ASSIGN_RESPONSE" | jq -e '.action' >/dev/null 2>&1; then
-        log "SUCCESS: Floating IP $FLOATING_IP assigned to $SERVER_NAME"
-    elif echo "$ASSIGN_RESPONSE" | jq -e '.error.code == "locked"' >/dev/null 2>&1; then
-        log "Floating IP already assigned to this server (treating as success)"
-    else
+        if echo "$ASSIGN_RESPONSE" | jq -e '.action' >/dev/null 2>&1; then
+            log "SUCCESS: Floating IP $FLOATING_IP assigned to $SERVER_NAME"
+            return 0
+        fi
+        if [ "$attempt" -lt "$ASSIGN_ATTEMPTS" ] \
+            && echo "$ASSIGN_RESPONSE" | jq -e '.error.code == "locked"' >/dev/null 2>&1; then
+            log "Floating IP is locked by another action (attempt $attempt/$ASSIGN_ATTEMPTS), retrying in 2s"
+            attempt=$((attempt + 1))
+            sleep 2
+            continue
+        fi
         log "ERROR: Failed to assign Floating IP via API"
         exit 1
-    fi
+    done
 }
 
 add_floating_ip_to_interface() {

@@ -53,7 +53,7 @@ provisioner:
         cloud_floating_ip_enabled: true
         cloud_api_token: "test-token"
         cloud_floating_ip_address: "203.0.113.10"
-        cloud_api_endpoint: "http://127.0.0.1:8088/v1"
+        cloud_api_endpoint: "http://127.0.0.1:18088/v1"
         cloud_floating_ip_interface: "eth0"
 
 verifier:

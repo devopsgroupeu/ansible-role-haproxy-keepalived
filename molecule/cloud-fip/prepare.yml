@@ -39,17 +39,30 @@
         mode: "0755"
         content: |
           #!/usr/bin/env python3
+          # Answers every second assign with HTTP 423 "locked" (another action
+          # still running), so each notify run must retry; requests without
+          # the expected bearer token get 401.
           import json
           from http.server import BaseHTTPRequestHandler, HTTPServer
 
+          POSTS = {"n": 0}
+
           class H(BaseHTTPRequestHandler):
-              def _send(self, obj):
-                  self.send_response(200)
+              def _send(self, obj, code=200):
+                  self.send_response(code)
                   self.send_header("Content-Type", "application/json")
                   self.end_headers()
                   self.wfile.write(json.dumps(obj).encode())
 
+              def _authorized(self):
+                  if self.headers.get("Authorization") == "Bearer test-token":
+                      return True
+                  self._send({"error": {"code": "unauthorized"}}, 401)
+                  return False
+
               def do_GET(self):
+                  if not self._authorized():
+                      return
                   if "/servers" in self.path:
                       self._send({"servers": [{"id": 1, "name": "fip-node"}]})
                   elif "/floating_ips" in self.path:
@@ -58,12 +71,18 @@
                       self._send({})
 
               def do_POST(self):
-                  self._send({"action": {"id": 1, "status": "running"}})
+                  if not self._authorized():
+                      return
+                  POSTS["n"] += 1
+                  if POSTS["n"] % 2 == 1:
+                      self._send({"error": {"code": "locked", "message": "locked"}}, 423)
+                  else:
+                      self._send({"action": {"id": 1, "status": "running"}}, 201)
 
               def log_message(self, *a):
                   return
 
-          HTTPServer(("127.0.0.1", 8088), H).serve_forever()
+          HTTPServer(("127.0.0.1", 18088), H).serve_forever()
 
     - name: Deploy mock API systemd unit
       ansible.builtin.copy:
