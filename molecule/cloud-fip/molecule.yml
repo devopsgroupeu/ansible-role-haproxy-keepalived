@@ -68,5 +68,6 @@ scenario:
     - prepare
     - converge
     - idempotence
+    - check
     - verify
     - destroy
