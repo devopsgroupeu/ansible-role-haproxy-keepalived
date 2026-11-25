@@ -4,7 +4,7 @@
 # ============================================================================
 # Optional tasks for cloud provider Floating IP automatic failover
 # Only runs when cloud_floating_ip_enabled: true
-# Supports: Hetzner Cloud ONLY (see README — DO/AWS are not implemented)
+# Supports: Hetzner Cloud ONLY (see README - DO/AWS are not implemented)
 
 - name: Validate cloud Floating IP configuration
   ansible.builtin.assert:
@@ -21,11 +21,16 @@
       Store API token in Ansible Vault for security!
     success_msg: "Cloud Floating IP configuration validated"
 
+# curl-minimal (EL9 default) conflicts with the curl package but provides the
+# same binary.
+- name: Check for an installed curl binary
+  ansible.builtin.stat:
+    path: /usr/bin/curl
+  register: cloud_curl_binary
+
 - name: Install curl and jq for API calls
   ansible.builtin.package:
-    name:
-      - curl
-      - jq
+    name: "{{ ([] if cloud_curl_binary.stat.exists else ['curl']) + ['jq'] }}"
     state: present
   become: true
 
@@ -49,7 +54,7 @@
       FLOATING_IP={{ cloud_floating_ip_address }}
   become: true
   no_log: true
-  notify: Restart keepalived
+  register: keepalived_env_result
 
 - name: Deploy cloud Floating IP notify script
   ansible.builtin.template:
@@ -59,7 +64,7 @@
     group: root
     mode: '0750'
   become: true
-  notify: Restart keepalived
+  register: keepalived_notify_script_result
 
 - name: Create log file for cloud Floating IP script
   ansible.builtin.file:
@@ -83,6 +88,9 @@
   register: cloud_api_test
   changed_when: false
   failed_when: false
+  # Read-only GET: run it in --check too (uri has no check mode support, and
+  # the result is read by the tasks below).
+  check_mode: false
   no_log: true  # Don't log API token
 
 - name: Display cloud API test result

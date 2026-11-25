@@ -14,10 +14,14 @@ vrrp_script haproxy_check {
 
 {% for vrrp_instance in keepalived_vrrp_instances %}
 
+{# preempt_delay only works when the initial state is not MASTER: keepalived
+   clears it and its config test exits non-zero. Priority still elects the
+   designated master. #}
+{% set _pd = (vrrp_instance.preempt_delay | default(keepalived_preempt_delay)) | int %}
 vrrp_instance {{ vrrp_instance.vrrp_instance_name }} {
   interface {{ keepalived_network_interface }}
   priority {{ vrrp_instance.priority | default((inventory_hostname == haproxy_loadbalancer_master) | ternary(100, 90)) }}
-{% if keepalived_nopreempt | bool %}
+{% if keepalived_nopreempt | bool or _pd > 0 %}
   state BACKUP
 {% else %}
   state {{ vrrp_instance.state | default((inventory_hostname == haproxy_loadbalancer_master) | ternary('MASTER', 'BACKUP')) }}
@@ -27,8 +31,8 @@ vrrp_instance {{ vrrp_instance.vrrp_instance_name }} {
   version {{ vrrp_instance.vrrp_version | default(keepalived_vrrp_version) }}
 {% if keepalived_nopreempt | bool %}
   nopreempt
-{% elif (vrrp_instance.preempt_delay | default(keepalived_preempt_delay)) | int > 0 %}
-  preempt_delay {{ vrrp_instance.preempt_delay | default(keepalived_preempt_delay) }}
+{% elif _pd > 0 %}
+  preempt_delay {{ _pd }}
 {% endif %}
 {% if (vrrp_instance.garp_master_delay | default(keepalived_garp_master_delay | default(false))) %}
   garp_master_delay {{ vrrp_instance.garp_master_delay | default(keepalived_garp_master_delay) }}

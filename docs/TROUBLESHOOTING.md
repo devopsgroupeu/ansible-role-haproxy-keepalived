@@ -34,7 +34,7 @@ journalctl -u haproxy -n 100 --no-pager
 
 | Error | Cause | Fix |
 |-------|-------|-----|
-| `cannot bind socket [0.0.0.0:80]` | Port already in use | `ss -tlnp \| grep :80` — stop the conflicting process |
+| `cannot bind socket [0.0.0.0:80]` | Port already in use | `ss -tlnp \| grep :80` - stop the conflicting process |
 | `cannot open the file '/etc/haproxy/certs/...'` | SSL cert path wrong or missing | Verify `crts` paths exist on the target host |
 | `parsing [haproxy.cfg]: unknown keyword 'X'` | Config syntax error | Check the generated config: `cat /etc/haproxy/haproxy.cfg` |
 | `backend 'X' has no server` | Empty `servers` list resolved to nothing | Verify inventory group exists and `gather_facts: true` is set |
@@ -53,9 +53,9 @@ journalctl -u keepalived -n 100 --no-pager
 
 | Error | Cause | Fix |
 |-------|-------|-----|
-| `Cant find interface eth0` | Wrong interface name | Run `ip link` on target — update `keepalived_network_interface` |
-| `VRRP_Instance ... Entering FAULT state` | HAProxy not running | Fix HAProxy first — Keepalived tracks it via `track_script` |
-| `bogus VRRP packet received` | Duplicate `virtual_router_id` on network | Choose a unique ID (1–255) not used by other VRRP instances on the same subnet |
+| `Cant find interface eth0` | Wrong interface name | Run `ip link` on target - update `keepalived_network_interface` |
+| `VRRP_Instance ... Entering FAULT state` | HAProxy not running | Fix HAProxy first - Keepalived tracks it via `track_script` |
+| `bogus VRRP packet received` | Duplicate `virtual_router_id` on network | Choose a unique ID (1-255) not used by other VRRP instances on the same subnet |
 
 ---
 
@@ -73,9 +73,9 @@ systemctl status haproxy
 
 **Common causes:**
 
-- HAProxy is down on the master node — Keepalived will drop to FAULT state if the tracked service fails. Fix HAProxy first.
-- `keepalived_unicast: true` but nodes can't reach each other on IP protocol 112 (VRRP) — check firewall rules between proxy nodes.
-- `virtual_router_id` collision — another system on the same subnet is using the same ID.
+- HAProxy is down on the master node - Keepalived will drop to FAULT state if the tracked service fails. Fix HAProxy first.
+- `keepalived_unicast: true` but nodes can't reach each other on IP protocol 112 (VRRP) - check firewall rules between proxy nodes.
+- `virtual_router_id` collision - another system on the same subnet is using the same ID.
 
 ---
 
@@ -84,7 +84,7 @@ systemctl status haproxy
 **Symptom:** Master node fails but VIP stays on master (or disappears entirely).
 
 ```bash
-# Simulate failure — stop HAProxy on master
+# Simulate failure - stop HAProxy on master
 systemctl stop haproxy
 
 # Watch Keepalived logs on backup node
@@ -95,9 +95,9 @@ Expected: within ~3 seconds the backup should log `Entering MASTER state` and th
 
 **Common causes:**
 
-- Firewall blocking VRRP traffic between nodes — allow IP protocol 112 (VRRP) between proxy hosts.
+- Firewall blocking VRRP traffic between nodes - allow IP protocol 112 (VRRP) between proxy hosts.
 - With `keepalived_unicast: true`, check that `proxy_hosts` inventory group contains both nodes so the unicast peer list is correct.
-- `haproxy_loadbalancer_master` / `haproxy_loadbalancer_backup` set to wrong hostnames — they must match `inventory_hostname` exactly.
+- `haproxy_loadbalancer_master` / `haproxy_loadbalancer_backup` set to wrong hostnames - they must match `inventory_hostname` exactly.
 
 ---
 
@@ -115,10 +115,10 @@ echo "show stat" | socat stdio /var/lib/haproxy/stats | cut -d',' -f1,2,18
 
 **Common causes:**
 
-- Health check endpoint (`httpcheck: true`) returns non-2xx — verify the backend app is running and the check URI is correct.
-- Wrong port in backend definition — verify `port` matches what the backend app listens on.
+- Health check endpoint (`httpcheck: true`) returns non-2xx - verify the backend app is running and the check URI is correct.
+- Wrong port in backend definition - verify `port` matches what the backend app listens on.
 - Firewall between proxy and backend nodes blocking the configured port.
-- `mode: tcp` with `httpcheck: true` — HTTP checks require `mode: http`. Use `option tcp-check` for TCP mode instead.
+- `mode: tcp` with `httpcheck: true` - HTTP checks require `mode: http`. Use `option tcp-check` for TCP mode instead.
 
 ---
 
@@ -136,10 +136,10 @@ curl -u admin:<password> http://<host>:1936/haproxy/stats
 
 **Common causes:**
 
-- `haproxy_stats: false` — set to `true` and re-run.
-- Wrong credentials — `haproxy_stats_page_user` / `haproxy_stats_page_pass` must match what you're using.
-- `haproxy_stats_bind_addr: "127.0.0.1"` — stats only accessible from localhost. Change to `"0.0.0.0"` for remote access.
-- Default password `"admin"` — the role's validation deliberately fails with the default password as a security measure. Set a real password.
+- `haproxy_stats: false` - set to `true` and re-run.
+- Wrong credentials - `haproxy_stats_page_user` / `haproxy_stats_page_pass` must match what you're using.
+- `haproxy_stats_bind_addr: "127.0.0.1"` - stats only accessible from localhost. Change to `"0.0.0.0"` for remote access.
+- Default password `"admin"` - the role's validation deliberately fails with the default password as a security measure. Set a real password.
 
 ---
 
@@ -157,13 +157,13 @@ openssl s_client -connect <vip>:443 -servername <hostname>
 
 **Common causes:**
 
-- Certificate file path in `crts` list doesn't exist on the target host — copy the PEM file first or use the `files/certs/` directory.
-- PEM file is missing the full chain — HAProxy requires the cert + intermediate + key in a single PEM file:
+- Certificate file path in `crts` list doesn't exist on the target host - copy the PEM file first or use the `files/certs/` directory.
+- PEM file is missing the full chain - HAProxy requires the cert + intermediate + key in a single PEM file:
   ```bash
   cat cert.crt intermediate.crt > full-chain.pem
   cat full-chain.pem private.key > /etc/haproxy/certs/example.com.pem
   ```
-- Frontend not set to `ssl: true` — verify the frontend definition includes `ssl: true` and the `crts` list.
+- Frontend not set to `ssl: true` - verify the frontend definition includes `ssl: true` and the `crts` list.
 
 ---
 
@@ -184,10 +184,10 @@ curl -H "Authorization: Bearer <token>" https://api.hetzner.cloud/v1/floating_ip
 
 **Common causes:**
 
-- `cloud_api_token` not set or expired — store in Ansible Vault and verify it works with a manual API call.
-- `cloud_floating_ip_address` not matching the actual floating IP — verify in your cloud provider's console.
+- `cloud_api_token` not set or expired - store in Ansible Vault and verify it works with a manual API call.
+- `cloud_floating_ip_address` not matching the actual floating IP - verify in your cloud provider's console.
 - Firewall on proxy nodes blocking outbound HTTPS to the cloud API endpoint.
-- Wrong `cloud_api_endpoint` — the bundled script targets Hetzner Cloud (`https://api.hetzner.cloud/v1`) only.
+- Wrong `cloud_api_endpoint` - the bundled script targets Hetzner Cloud (`https://api.hetzner.cloud/v1`) only.
 
 ---
 

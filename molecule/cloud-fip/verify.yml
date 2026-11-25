@@ -43,3 +43,72 @@
           - fip_log.stat.mode == '0600'
         fail_msg: "Cloud FIP log must be 0600"
         success_msg: "Cloud FIP log is 0600"
+
+    - name: Dry-run the role's logrotate rules
+      ansible.builtin.command: logrotate -d /etc/logrotate.d/haproxy-keepalived
+      register: hkv_logrotate
+      changed_when: false
+
+    - name: Verify logrotate covers the notify log and skips disabled keepalived
+      ansible.builtin.assert:
+        that:
+          - "'/var/log/cloud-floating-ip.log' in hkv_logrotate.stderr"
+          - "'/var/log/haproxy-traffic.log' in hkv_logrotate.stderr"
+          - "'/var/log/keepalived.log' not in hkv_logrotate.stderr"
+          # A missing state file on a host that never rotated is not a rule error.
+          - >-
+            hkv_logrotate.stderr_lines | select('search', '^error')
+            | reject('search', 'state file') | list | length == 0
+        fail_msg: "logrotate -d output: {{ hkv_logrotate.stderr_lines }}"
+        success_msg: "Notify log rotated; keepalived log not listed"
+
+    - name: Assert the notify script keeps the token off the curl command line
+      ansible.builtin.assert:
+        that:
+          - >-
+            (fip_script.content | b64decode
+            | regex_findall('Authorization: Bearer \$')) | length == 0
+          - "'-H @$HDR_FILE' in (fip_script.content | b64decode)"
+        fail_msg: "The notify script passes the bearer token on argv"
+        success_msg: "Bearer token passed through a header file"
+
+    - name: Run the notify script as MASTER against the locking mock API
+      ansible.builtin.command: /usr/local/bin/cloud-floating-ip-notify.sh MASTER
+      register: hkv_fip_master
+      changed_when: true
+
+    - name: Read the notify script log
+      ansible.builtin.slurp:
+        src: /var/log/cloud-floating-ip.log
+      register: hkv_fip_log
+
+    - name: Read interface addresses after the MASTER transition
+      ansible.builtin.command: ip -o addr show eth0
+      register: hkv_fip_addr
+      changed_when: false
+
+    - name: Assert a locked assign was retried and then succeeded
+      ansible.builtin.assert:
+        that:
+          - hkv_fip_master.rc == 0
+          - "'is locked by another action (attempt 1/5)' in (hkv_fip_log.content | b64decode)"
+          - "'SUCCESS: Floating IP 203.0.113.10 assigned' in (hkv_fip_log.content | b64decode)"
+          - "'203.0.113.10/32' in hkv_fip_addr.stdout"
+        fail_msg: "Locked assign not retried: {{ (hkv_fip_log.content | b64decode).splitlines() | last }}"
+        success_msg: "Locked assign retried; Floating IP assigned and added to eth0"
+
+    - name: Run the notify script as BACKUP to release the Floating IP
+      ansible.builtin.command: /usr/local/bin/cloud-floating-ip-notify.sh BACKUP
+      changed_when: true
+
+    - name: Read interface addresses after the BACKUP transition
+      ansible.builtin.command: ip -o addr show eth0
+      register: hkv_fip_addr_backup
+      changed_when: false
+
+    - name: Assert the Floating IP left the interface
+      ansible.builtin.assert:
+        that:
+          - "'203.0.113.10/32' not in hkv_fip_addr_backup.stdout"
+        fail_msg: "Floating IP still on eth0 after BACKUP"
+        success_msg: "Floating IP removed on BACKUP"

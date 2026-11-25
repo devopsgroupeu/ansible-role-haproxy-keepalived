@@ -1,0 +1,39 @@
+{{ ansible_managed | comment }}
+# "su root adm" (the Ubuntu global default) keeps the rules valid on their own:
+# logrotate refuses to rotate in a group-writable /var/log without it.
+{% set hkv_rsyslog_logs = (['/var/log/haproxy-traffic.log', '/var/log/haproxy-admin.log']
+                           if haproxy_enabled | bool and not haproxy_journald | bool else [])
+                          + (['/var/log/keepalived.log'] if keepalived_enabled | bool else []) %}
+{% if hkv_rsyslog_logs | length > 0 %}
+# Files written by the rsyslog rules this role deploys.
+{{ hkv_rsyslog_logs | join('\n') }}
+{
+    su root adm
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    sharedscripts
+    postrotate
+        [ -x /usr/lib/rsyslog/rsyslog-rotate ] && /usr/lib/rsyslog/rsyslog-rotate || systemctl kill -s HUP rsyslog.service
+    endscript
+}
+{% endif %}
+{% if cloud_floating_ip_enabled | bool %}
+
+# The Floating IP notify script opens the log for every line it writes, so no
+# signal is needed after rotation.
+{{ cloud_floating_ip_log }}
+{
+    su root adm
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0600 root root
+}
+{% endif %}

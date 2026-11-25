@@ -1,33 +1,4 @@
 ---
-- name: Install Keepalived build toolchain (RHEL family)
-  ansible.builtin.package:
-    name:
-      - make
-      - gcc
-      - openssl-devel
-      - libnl3-devel
-      - net-snmp-devel
-      # Required so configure compiles sd_notify support; the generated
-      # Type=notify systemd unit times out at start without it.
-      - systemd-devel
-    state: present
-  when: ansible_facts['os_family'] == 'RedHat'
-
-- name: Install Keepalived build toolchain (Debian/Ubuntu)
-  ansible.builtin.package:
-    name:
-      - build-essential
-      - gcc
-      - libssl-dev
-      - libnl-3-dev
-      - libnl-genl-3-dev
-      - libsnmp-dev
-      # Required so configure compiles sd_notify support; the generated
-      # Type=notify systemd unit times out at start without it.
-      - libsystemd-dev
-    state: present
-  when: ansible_facts['os_family'] == 'Debian'
-
 - name: Check Keepalived installation status (source)
   block:
     - name: Get installed Keepalived version
@@ -51,9 +22,43 @@
       {{ (installed_keepalived_version | default('') | length == 0)
          or (installed_keepalived_version is version(keepalived_version, '!=')) }}
 
+# Reset on every role run, like haproxy_source_changed.
+- name: Reset the Keepalived binary change flag
+  ansible.builtin.set_fact:
+    keepalived_source_changed: false
+
 - name: Install Keepalived from source if required
   when: keepalived_installation_required
   block:
+    - name: Install Keepalived build toolchain (RHEL family)
+      ansible.builtin.package:
+        name:
+          - make
+          - gcc
+          - openssl-devel
+          - libnl3-devel
+          - net-snmp-devel
+          # Required so configure compiles sd_notify support; the generated
+          # Type=notify systemd unit times out at start without it.
+          - systemd-devel
+        state: present
+      when: ansible_facts['os_family'] == 'RedHat'
+
+    - name: Install Keepalived build toolchain (Debian/Ubuntu)
+      ansible.builtin.package:
+        name:
+          - build-essential
+          - gcc
+          - libssl-dev
+          - libnl-3-dev
+          - libnl-genl-3-dev
+          - libsnmp-dev
+          # Required so configure compiles sd_notify support; the generated
+          # Type=notify systemd unit times out at start without it.
+          - libsystemd-dev
+        state: present
+      when: ansible_facts['os_family'] == 'Debian'
+
     - name: Require a source checksum (Keepalived)
       ansible.builtin.assert:
         that:
@@ -102,6 +107,12 @@
       register: keepalived_install
       changed_when: keepalived_install.rc == 0
 
+    # Consumed by "Apply Keepalived configuration change" in keepalived.yml so
+    # a running Keepalived is restarted onto the new binary in the same play.
+    - name: Flag Keepalived binary change for restart
+      ansible.builtin.set_fact:
+        keepalived_source_changed: "{{ keepalived_install is changed }}"
+
     - name: Check generated keepalived.service exists
       ansible.builtin.stat:
         path: "{{ haproxy_install_dir }}/keepalived-{{ keepalived_version }}/keepalived/keepalived.service"
@@ -116,12 +127,10 @@
       notify: Reload systemd
       when: keepalived_unit_src.stat.exists
 
-- name: Remove Keepalived build toolchain after source install
-  ansible.builtin.package:
-    name:
-      - gcc
-      - make
-    state: absent
-  when:
-    - keepalived_remove_build_deps | bool
-    - keepalived_compile is defined and keepalived_compile is changed
+    - name: Remove Keepalived build toolchain after source install
+      ansible.builtin.package:
+        name:
+          - gcc
+          - make
+        state: absent
+      when: keepalived_remove_build_deps | bool

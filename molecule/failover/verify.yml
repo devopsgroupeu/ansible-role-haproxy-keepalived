@@ -120,3 +120,107 @@
         fail_msg: "nopreempt violated: recovered master reclaimed VIP"
         success_msg: "nopreempt honored: recovered master stayed BACKUP"
       when: inventory_hostname == 'fo-master'
+
+# haproxy_config_change_action: reloaded must apply a change without replacing
+# the HAProxy master process.
+- name: Assert a reload applies a config change in place
+  hosts: proxy_hosts
+  become: true
+  gather_facts: true
+  vars:
+    hkv_reload_frontends:
+      - name: fe
+        address: "*"
+        port: 8080
+        default_backend: be
+        mode: http
+      - name: fe_reload
+        address: "*"
+        port: 8081
+        default_backend: be
+        mode: http
+  tasks:
+    - name: Read the HAProxy unit before the change
+      ansible.builtin.systemd_service:
+        name: haproxy
+      register: hkv_unit_before
+
+    - name: Re-apply the role with an added frontend
+      ansible.builtin.include_role:
+        name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}"
+      vars:
+        haproxy_frontends: "{{ hkv_reload_frontends }}"
+
+    - name: Wait for the added frontend to listen
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: 8081
+        timeout: 15
+
+    - name: Read the HAProxy unit after the change
+      ansible.builtin.systemd_service:
+        name: haproxy
+      register: hkv_unit_after
+
+    - name: HAProxy was reloaded, not restarted
+      ansible.builtin.assert:
+        that:
+          - hkv_unit_after.status.MainPID == hkv_unit_before.status.MainPID
+          - hkv_unit_after.status.ActiveState == 'active'
+        fail_msg: >-
+          MainPID {{ hkv_unit_before.status.MainPID }} -> {{ hkv_unit_after.status.MainPID }},
+          state {{ hkv_unit_after.status.ActiveState }}
+        success_msg: "Config change applied by reload (MainPID {{ hkv_unit_before.status.MainPID }} kept)"
+
+# Restarts are throttled to one host at a time: the two HAProxy restart
+# windows must not overlap. Containers share the host kernel, so the monotonic
+# timestamps of both nodes are comparable.
+- name: Assert restarts never overlap across the load balancers
+  hosts: proxy_hosts
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Re-apply the role with restarts and another frontend
+      ansible.builtin.include_role:
+        name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}"
+      vars:
+        haproxy_config_change_action: restarted
+        haproxy_frontends:
+          - name: fe
+            address: "*"
+            port: 8080
+            default_backend: be
+            mode: http
+          - name: fe_restart
+            address: "*"
+            port: 8082
+            default_backend: be
+            mode: http
+
+    - name: Read the HAProxy restart window
+      ansible.builtin.systemd_service:
+        name: haproxy
+      register: hkv_restart_window
+
+    - name: Parse the restart window
+      ansible.builtin.set_fact:
+        hkv_window_exit: "{{ hkv_restart_window.status.ActiveExitTimestampMonotonic }}"
+        hkv_window_enter: "{{ hkv_restart_window.status.ActiveEnterTimestampMonotonic }}"
+
+    - name: The restart windows do not overlap
+      vars:
+        hkv_m: "{{ hostvars['fo-master'] }}"
+        hkv_b: "{{ hostvars['fo-backup'] }}"
+      ansible.builtin.assert:
+        that:
+          - hkv_m.hkv_window_enter | int > hkv_m.hkv_window_exit | int
+          - hkv_b.hkv_window_enter | int > hkv_b.hkv_window_exit | int
+          - >-
+            hkv_m.hkv_window_enter | int <= hkv_b.hkv_window_exit | int
+            or hkv_b.hkv_window_enter | int <= hkv_m.hkv_window_exit | int
+        fail_msg: >-
+          HAProxy restarted on both nodes at once:
+          master {{ hkv_m.hkv_window_exit }}..{{ hkv_m.hkv_window_enter }},
+          backup {{ hkv_b.hkv_window_exit }}..{{ hkv_b.hkv_window_enter }}
+        success_msg: "HAProxy restarted on one node at a time"
+      run_once: true

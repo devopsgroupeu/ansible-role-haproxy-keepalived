@@ -1,0 +1,10 @@
+---
+# The distro logrotate rules only cover /var/log/haproxy.log, so the files
+# written by the role's rsyslog rules and the notify script are rotated here.
+- name: Configure rotation of role-managed log files
+  ansible.builtin.template:
+    src: haproxy-keepalived-logrotate.j2
+    dest: /etc/logrotate.d/haproxy-keepalived
+    owner: root
+    group: root
+    mode: "0644"

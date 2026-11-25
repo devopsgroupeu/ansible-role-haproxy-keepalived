@@ -105,6 +105,77 @@
         success_msg: "Stats hardened: loopback bind, admin off"
 
     # ========================================================================
+    # Health checks: http_check-only and httpcheck_method backends
+    # ========================================================================
+
+    - name: Verify health check directives render per backend
+      vars:
+        hkv_hap_text: "{{ hap_cfg_stats.content | b64decode }}"
+        hkv_be_check_only: "{{ hkv_hap_text.split('backend be_http_check_only')[1].split('backend ')[0] }}"
+        hkv_be_method: "{{ hkv_hap_text.split('backend be_httpcheck_method')[1].split('backend ')[0] }}"
+      ansible.builtin.assert:
+        that:
+          - "'option httpchk' in hkv_be_check_only"
+          - "'http-check send meth GET uri /' in hkv_be_check_only"
+          - "'http-check expect status 200' in hkv_be_check_only"
+          - "'option httpchk' in hkv_be_method"
+          - "'option httpchk GET' not in hkv_be_method"
+          - "'http-check send meth GET uri /' in hkv_be_method"
+        fail_msg: "Health check directives rendered incorrectly"
+        success_msg: "option httpchk and http-check send rendered for both backends"
+
+    - name: Verify HAProxy does not ignore the http-check rules
+      ansible.builtin.assert:
+        that:
+          - "'uses http-check rules without' not in haproxy_syntax_check.stderr"
+        fail_msg: "haproxy -c reports ignored http-check rules: {{ haproxy_syntax_check.stderr }}"
+        success_msg: "No http-check rules are ignored"
+
+    - name: Verify inventory servers resolve to addresses without injected facts
+      ansible.builtin.assert:
+        that:
+          - "(hap_cfg_stats.content | b64decode) is search('server backend1 [0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+:80')"
+          - "'server backend1 backend1:' not in (hap_cfg_stats.content | b64decode)"
+        fail_msg: "backend1 was not resolved to its gathered IPv4 address"
+        success_msg: "backend1 resolved from ansible_facts"
+
+    - name: Verify the listen section renders from the documented schema
+      ansible.builtin.assert:
+        that:
+          - "'listen mysql' in (hap_cfg_stats.content | b64decode)"
+          - "'bind *:3306' in (hap_cfg_stats.content | b64decode)"
+          - "'server mysql01 127.0.0.1:3306 check' in (hap_cfg_stats.content | b64decode)"
+        fail_msg: "listen section did not render from name/address/port/servers"
+        success_msg: "listen mysql rendered with bind *:3306"
+
+    - name: Read backend states from the stats CSV
+      ansible.builtin.uri:
+        url: "http://localhost:1936/haproxy/stats;csv"
+        user: admin
+        password: "{{ haproxy_stats_page_pass }}"
+        force_basic_auth: true
+        return_content: true
+      register: hkv_stats_csv
+      until: >-
+        hkv_stats_csv.content is defined
+        and (hkv_stats_csv.content | regex_search('be_http_check_only,backend1,([^,]*,){15}UP') is not none)
+        and (hkv_stats_csv.content | regex_search('be_httpcheck_method,backend1,([^,]*,){15}UP') is not none)
+      retries: 10
+      delay: 2
+
+    - name: Read the HAProxy journal
+      ansible.builtin.command: journalctl -u haproxy --no-pager
+      register: hkv_hap_journal
+      changed_when: false
+
+    - name: Verify HAProxy does not warn about a duplicate pidfile
+      ansible.builtin.assert:
+        that:
+          - "'already specified' not in hkv_hap_journal.stdout"
+        fail_msg: "HAProxy logged a duplicate pidfile (the unit already passes -p)"
+        success_msg: "No duplicate pidfile warning"
+
+    # ========================================================================
     # HAP-24: http-server-close not in default options
     # ========================================================================
 
@@ -146,7 +217,7 @@
     # HAP-16: Source-specific build deps absent in package mode
     # Note: the geerlingguy base image ships gcc/build-essential pre-installed.
     # We assert the role-specific source deps (liblua5.4-dev, libpcre2-dev)
-    # were NOT installed — those are only added by haproxy_install_source.yml.
+    # were NOT installed - those are only added by haproxy_install_source.yml.
     # ========================================================================
 
     - name: Check for liblua5.4-dev (source-only HAProxy build dep)
@@ -202,7 +273,7 @@
         success_msg: "Keepalived configuration file exists"
 
     - name: Validate Keepalived configuration
-      ansible.builtin.command: keepalived -t
+      ansible.builtin.command: keepalived -t -f /etc/keepalived/keepalived.conf
       changed_when: false
       register: keepalived_syntax_check
       failed_when: keepalived_syntax_check.rc != 0
@@ -241,6 +312,19 @@
           - "'state MASTER' not in (ka_cfg.content | b64decode)"
         fail_msg: "Sync group / nopreempt / tunables not rendered, or MASTER state forced under nopreempt"
         success_msg: "VRRP sync group + flap-control tunables rendered"
+
+    - name: Verify the per-instance advert_int override applies to its instance only
+      vars:
+        hkv_ka_text: "{{ ka_cfg.content | b64decode }}"
+        hkv_vi_test: "{{ hkv_ka_text.split('vrrp_instance VI_TEST {')[1].split('vrrp_instance ')[0] }}"
+        hkv_vi_test2: "{{ hkv_ka_text.split('vrrp_instance VI_TEST2 {')[1].split('vrrp_instance ')[0] }}"
+      ansible.builtin.assert:
+        that:
+          - "'advert_int 3' in hkv_vi_test2"
+          - "'advert_int 2' in hkv_vi_test"
+          - "'advert_int 3' not in hkv_vi_test"
+        fail_msg: "Per-instance advert_int override not rendered (or leaked to another instance)"
+        success_msg: "Per-instance advert_int override rendered for VI_TEST2 only"
 
     # ========================================================================
     # HAP-27: Configurable peer group rendered
@@ -299,15 +383,21 @@
         fail_msg: "keepalived log facility not set via systemd drop-in"
         success_msg: "keepalived facility set via drop-in; no stray daemon"
 
-    - name: Assert Reload handlers are defined in the role
-      ansible.builtin.command: >-
-        grep -q "Reload keepalived" {{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/handlers/main.yml
-      delegate_to: localhost
-      become: false
-      run_once: true
+    # The running HAProxy must serve the role's config, not the stock one a
+    # package install started (a lost or deferred apply leaves no role
+    # listeners).
+    - name: Read listening TCP sockets
+      ansible.builtin.command: ss -Hltn
+      register: hkv_listen
       changed_when: false
-      register: reload_handler_grep
-      failed_when: reload_handler_grep.rc != 0
+
+    - name: Every role frontend, listen and stats port is listening
+      ansible.builtin.assert:
+        that:
+          - hkv_listen.stdout_lines | select('search', ':' ~ item ~ '\\s') | list | length > 0
+        fail_msg: "Nothing listens on port {{ item }}: {{ hkv_listen.stdout_lines }}"
+        success_msg: "Port {{ item }} is listening"
+      loop: "{{ haproxy_frontends | map(attribute='port') | list + haproxy_listens | map(attribute='port') | list + [1936] }}"
 
     - name: Read HAProxy rsyslog config
       ansible.builtin.slurp:
@@ -375,6 +465,69 @@
         fail_msg: "Certificate directory not found"
         success_msg: "Certificate directory exists"
 
+    - name: Re-apply the tmpfiles rule for haproxy.conf as at boot
+      ansible.builtin.command: systemd-tmpfiles --create haproxy.conf
+      changed_when: false
+
+    - name: Stat the admin socket directory after systemd-tmpfiles
+      ansible.builtin.stat:
+        path: /run/haproxy
+      register: hkv_run_haproxy
+
+    - name: Verify tmpfiles keeps the role's mode on /run/haproxy
+      ansible.builtin.assert:
+        that:
+          - hkv_run_haproxy.stat.isdir
+          - hkv_run_haproxy.stat.mode == '0750'
+          - hkv_run_haproxy.stat.pw_name == 'root'
+          - hkv_run_haproxy.stat.gr_name == 'haproxy'
+        fail_msg: >-
+          /run/haproxy is {{ hkv_run_haproxy.stat.mode }}
+          {{ hkv_run_haproxy.stat.pw_name }}:{{ hkv_run_haproxy.stat.gr_name }}
+          after systemd-tmpfiles (vendor rule not shadowed)
+        success_msg: "/run/haproxy is 0750 root:haproxy after systemd-tmpfiles"
+
+    - name: Stat the credential-bearing configs
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - /etc/haproxy/haproxy.cfg
+        - /etc/keepalived/keepalived.conf
+      register: hkv_cred_cfgs
+
+    - name: Verify the configs are 0640 and not world-readable
+      ansible.builtin.assert:
+        that:
+          - item.stat.mode == '0640'
+          - item.stat.pw_name == 'root'
+          - item.stat.gr_name == ('haproxy' if 'haproxy' in item.item else 'root')
+        fail_msg: "{{ item.item }} is {{ item.stat.mode }} {{ item.stat.pw_name }}:{{ item.stat.gr_name }}"
+        success_msg: "{{ item.item }} is 0640"
+      loop: "{{ hkv_cred_cfgs.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Try to read haproxy.cfg as an unprivileged user
+      ansible.builtin.command: su -s /bin/sh nobody -c 'cat /etc/haproxy/haproxy.cfg'
+      register: hkv_nobody_read
+      changed_when: false
+      failed_when: hkv_nobody_read.rc == 0
+
+    - name: Find world-readable config backups
+      ansible.builtin.command: >-
+        find /etc/haproxy /etc/keepalived
+        ( -name 'haproxy.cfg.*' -o -name 'keepalived.conf.*' ! -name '*.sample' )
+        -perm /004
+      register: hkv_backup_perms
+      changed_when: false
+
+    - name: Verify no config backup is world-readable
+      ansible.builtin.assert:
+        that:
+          - hkv_backup_perms.stdout | length == 0
+        fail_msg: "World-readable config backups: {{ hkv_backup_perms.stdout_lines }}"
+        success_msg: "Config backups are not world-readable"
+
     # ========================================================================
     # Log Files
     # ========================================================================
@@ -403,31 +556,131 @@
         fail_msg: "Keepalived rsyslog configuration not found"
         success_msg: "Keepalived rsyslog configuration exists"
 
-- name: Verify VIP assignment on master
-  hosts: proxy-master
-  become: true
-  tasks:
-    - name: Wait for VIP to be assigned
-      ansible.builtin.wait_for:
-        timeout: 10
-      delegate_to: localhost
-      become: false
-      # nopreempt: VIP will be claimed by whichever node wins election; skip assertion
-      when: not (keepalived_nopreempt | default(false) | bool)
-
-    - name: Check if VIP is assigned
-      ansible.builtin.command: ip addr show
-      register: ip_check
+    - name: Dry-run the role's logrotate rules
+      ansible.builtin.command: logrotate -d /etc/logrotate.d/haproxy-keepalived
+      register: hkv_logrotate
       changed_when: false
-      when: not (keepalived_nopreempt | default(false) | bool)
 
-    - name: Verify VIP is present on master
+    - name: Verify logrotate covers the role-managed log files
       ansible.builtin.assert:
         that:
-          - "'172.18.0.100' in ip_check.stdout"
-        fail_msg: "Virtual IP not found on master node"
-        success_msg: "Virtual IP is assigned to master node"
-      when: not (keepalived_nopreempt | default(false) | bool)
+          - "'/var/log/haproxy-traffic.log' in hkv_logrotate.stderr"
+          - "'/var/log/haproxy-admin.log' in hkv_logrotate.stderr"
+          - "'/var/log/keepalived.log' in hkv_logrotate.stderr"
+          # A missing state file on a host that never rotated is not a rule error.
+          - >-
+            hkv_logrotate.stderr_lines | select('search', '^error')
+            | reject('search', 'state file') | list | length == 0
+        fail_msg: "logrotate -d output: {{ hkv_logrotate.stderr_lines }}"
+        success_msg: "Role-managed log files are rotated"
+
+# Every configured VIP must be held by exactly one load balancer, compared as
+# exact addresses (with nopreempt either node may be the holder).
+- name: Verify VIP assignment
+  hosts: proxy_hosts
+  become: true
+  gather_facts: false
+  vars:
+    hkv_vips: >-
+      {{ keepalived_vrrp_instances | map(attribute='virtual_ipaddress')
+         | map('regex_replace', '/.*$', '') | list }}
+  tasks:
+    - name: Read interface addresses
+      ansible.builtin.command: ip -o addr show
+      register: hkv_addr
+      changed_when: false
+
+    - name: Collect the VIPs held by this node
+      ansible.builtin.set_fact:
+        hkv_held_vips: >-
+          {{ hkv_addr.stdout | regex_findall('inet ([0-9.]+)/') | intersect(hkv_vips) }}
+
+    - name: Each VIP is on exactly one node
+      vars:
+        hkv_all_held: >-
+          {{ ansible_play_hosts | map('extract', hostvars, 'hkv_held_vips') | flatten }}
+      ansible.builtin.assert:
+        that:
+          - hkv_all_held | sort == hkv_vips | sort
+        fail_msg: "VIPs {{ hkv_vips }} held as {{ ansible_play_hosts | zip(ansible_play_hosts | map('extract', hostvars, 'hkv_held_vips')) | list }}"
+        success_msg: "Each VIP is held by exactly one node"
+      run_once: true
+
+- name: Verify validate.yml rejects invalid VRRP settings
+  hosts: proxy-master
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Run validate.yml with a 9-character auth_pass
+      block:
+        - name: Include the role's validation tasks
+          ansible.builtin.include_role:
+            name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}"
+            tasks_from: validate
+          vars:
+            keepalived_auth_pass: "123456789"
+
+        - name: Fail when validation accepted the long auth_pass
+          ansible.builtin.fail:
+            msg: "validate.yml accepted a 9-character auth_pass"
+      rescue:
+        - name: Assert the auth_pass length check rejected it
+          ansible.builtin.assert:
+            that:
+              - "'must be 1 to 8 characters' in ansible_failed_result.msg"
+            fail_msg: "Unexpected failure: {{ ansible_failed_result.msg }}"
+            success_msg: "9-character auth_pass rejected by validate.yml"
+
+    - name: Run validate.yml with virtual_router_id 256
+      block:
+        - name: Include the role's validation tasks
+          ansible.builtin.include_role:
+            name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}"
+            tasks_from: validate
+          vars:
+            keepalived_vrrp_instances:
+              - vrrp_instance_name: VI_BAD
+                virtual_ipaddress: "172.18.0.120"
+                virtual_router_id: 256
+
+        - name: Fail when validation accepted the out-of-range router id
+          ansible.builtin.fail:
+            msg: "validate.yml accepted virtual_router_id 256"
+      rescue:
+        - name: Assert the router id range check rejected it
+          ansible.builtin.assert:
+            that:
+              - "'must be between 1 and 255' in ansible_failed_result.msg"
+            fail_msg: "Unexpected failure: {{ ansible_failed_result.msg }}"
+            success_msg: "virtual_router_id 256 rejected by validate.yml"
+
+    - name: Run validate.yml with an IPv6 VIP
+      block:
+        - name: Include the role's validation tasks
+          ansible.builtin.include_role:
+            name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}"
+            tasks_from: validate
+          vars:
+            keepalived_vrrp_instances:
+              - vrrp_instance_name: VI_V6
+                virtual_ipaddress: "2001:db8::100/64"
+                virtual_router_id: 53
+
+        - name: Fail when validation accepted the IPv6 VIP
+          ansible.builtin.fail:
+            msg: "validate.yml accepted an IPv6 VIP"
+      rescue:
+        # The VIP check loops over the instances: the message is per item.
+        - name: Assert the VIP check names the IPv4-only limit
+          vars:
+            hkv_v6_msgs: >-
+              {{ ansible_failed_result.results | default([ansible_failed_result])
+                 | map(attribute='msg') | join(' ') }}
+          ansible.builtin.assert:
+            that:
+              - "'IPv6 VIPs are not supported by this role' in hkv_v6_msgs"
+            fail_msg: "Unexpected failure: {{ hkv_v6_msgs }}"
+            success_msg: "IPv6 VIP rejected with the IPv4-only message"
 
 - name: Display test summary
   hosts: proxy_hosts
@@ -445,3 +698,6 @@
           - "Configuration: Valid and active"
           - "=========================================="
       run_once: true
+
+- name: Render checks
+  ansible.builtin.import_playbook: render.yml

@@ -6,7 +6,10 @@
 # proceeding with installation and configuration.
 # ============================================================================
 
+# Only Keepalived uses the master/backup names (priority, initial state, VIP
+# check), so HAProxy-only deployments do not need them.
 - name: Validate load balancer node identification
+  when: keepalived_enabled | bool
   ansible.builtin.assert:
     that:
       - haproxy_loadbalancer_master is defined
@@ -36,6 +39,28 @@
           - haproxy_version is version('2.0', '>=')
         fail_msg: "HAProxy version must be 2.0 or higher. Current: {{ haproxy_version | default('not set') }}"
         success_msg: "HAProxy version {{ haproxy_version }} is valid"
+
+    # Branch repos exist only for these releases (haproxy.debian.net
+    # *-backports-<branch> suites, vbernat haproxy-<branch> PPAs).
+    - name: Validate haproxy_branch for package installs
+      when:
+        - haproxy_install_method == 'package'
+        - haproxy_branch | string | length > 0
+      vars:
+        haproxy_branch_matrix:
+          noble: ["3.0", "3.2"]
+          bookworm: ["3.0", "3.2"]
+          trixie: ["3.2", "3.4"]
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['os_family'] == 'Debian'
+          - (haproxy_branch | string) in haproxy_branch_matrix.get(ansible_facts['distribution_release'], [])
+        fail_msg: >-
+          haproxy_branch '{{ haproxy_branch }}' is not available for
+          {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_release'] }}.
+          Branch repos exist for Debian/Ubuntu only, for these releases and
+          branches: {{ haproxy_branch_matrix | to_json }}.
+        success_msg: "haproxy_branch {{ haproxy_branch }} is available for {{ ansible_facts['distribution_release'] }}"
 
     - name: Validate HAProxy frontends and backends are defined
       when:
@@ -95,7 +120,8 @@
           - item.virtual_ipaddress is match('^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(/([0-9]|[1-2][0-9]|3[0-2]))?$')
         fail_msg: |
           VRRP instance {{ item.vrrp_instance_name | default('unnamed') }}: virtual_ipaddress
-          '{{ item.virtual_ipaddress | default('') }}' is not a valid IP address (with optional /prefix).
+          '{{ item.virtual_ipaddress | default('') }}' is not a valid IPv4 address with optional /prefix
+          (IPv6 VIPs are not supported by this role).
         success_msg: "VRRP instance {{ item.vrrp_instance_name }} virtual_ipaddress is valid"
 
     - name: Validate peer group for unicast mode
@@ -158,6 +184,43 @@
           keepalived_auth_pass is empty. Set keepalived_auth_pass (store in
           Ansible Vault: vault_keepalived_auth_pass).
         success_msg: "VRRP auth credentials validated"
+
+    # keepalived uses only the first 8 characters of auth_pass and rejects the
+    # config (exit 5) when it has to truncate; catch it here with a readable
+    # message instead of behind the template's no_log.
+    - name: Validate VRRP auth - password length
+      when: keepalived_auth_type | default('') | length > 0
+      ansible.builtin.assert:
+        that:
+          - keepalived_auth_pass | length <= 8
+          - >-
+            keepalived_vrrp_instances
+            | map(attribute='auth_pass', default=keepalived_auth_pass)
+            | map('length') | reject('ge', 1) | list | length == 0
+          - >-
+            keepalived_vrrp_instances
+            | map(attribute='auth_pass', default=keepalived_auth_pass)
+            | map('length') | select('gt', 8) | list | length == 0
+        fail_msg: >-
+          VRRP auth_pass must be 1 to 8 characters (keepalived uses only the
+          first 8 and rejects a longer one). Check keepalived_auth_pass and the
+          auth_pass of these VRRP instances:
+          {% for i in keepalived_vrrp_instances %}{% set p = i.auth_pass | default(keepalived_auth_pass) %}{% if p | length < 1 or p | length > 8 %}{{ i.vrrp_instance_name | default('unnamed') }} {% endif %}{% endfor %}
+        success_msg: "VRRP auth_pass length validated"
+
+    - name: Validate virtual_router_id range
+      ansible.builtin.assert:
+        that:
+          - >-
+            keepalived_vrrp_instances | map(attribute='virtual_router_id')
+            | map('int') | reject('ge', 1) | list | length == 0
+          - >-
+            keepalived_vrrp_instances | map(attribute='virtual_router_id')
+            | map('int') | select('gt', 255) | list | length == 0
+        fail_msg: >-
+          virtual_router_id must be between 1 and 255. Current:
+          {{ keepalived_vrrp_instances | map(attribute='virtual_router_id') | list }}
+        success_msg: "All virtual_router_id values are within 1-255"
 
 - name: Display configuration summary
   ansible.builtin.debug:

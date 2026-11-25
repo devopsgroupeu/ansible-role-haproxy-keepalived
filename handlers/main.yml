@@ -6,16 +6,25 @@
   ansible.builtin.systemd_service:
     daemon_reload: true
 
+# Restart handlers run on one host at a time, so both load balancers are never
+# down together.
 - name: Restart keepalived
   ansible.builtin.systemd_service:
     name: keepalived
     state: restarted
+  throttle: 1
   when: keepalived_enabled | bool
 
 - name: Restart haproxy
   ansible.builtin.systemd_service:
     name: haproxy
     state: restarted
+  throttle: 1
+
+# By basename, so the /etc/tmpfiles.d file is used as it is at boot.
+- name: Apply HAProxy tmpfiles rules
+  ansible.builtin.command: systemd-tmpfiles --create haproxy.conf
+  changed_when: true
 
 - name: Reload keepalived
   ansible.builtin.systemd_service:
@@ -36,12 +45,15 @@
     enabled: true
     state: started
 
+# Backups keep the previous credentials, so the ones kept are made 0640 too
+# (backups written before the config became 0640 are still world-readable).
 - name: Cleanup haproxy config backups
   ansible.builtin.shell: |
     set -o pipefail
     find {{ haproxy_config_dir }} -name 'haproxy.cfg.*' -printf '%T@ %p\0' |
       sort -zn | head -zn -2 | cut -zd' ' -f2- |
       xargs -0 rm -f
+    find {{ haproxy_config_dir }} -name 'haproxy.cfg.*' -exec chmod 0640 {} +
   args:
     executable: /bin/bash
   changed_when: false
@@ -52,6 +64,7 @@
     find {{ keepalived_config_dir }} -name 'keepalived.conf.*' ! -name 'keepalived.conf.sample' -printf '%T@ %p\0' |
       sort -zn | head -zn -2 | cut -zd' ' -f2- |
       xargs -0 rm -f
+    find {{ keepalived_config_dir }} -name 'keepalived.conf.*' ! -name 'keepalived.conf.sample' -exec chmod 0640 {} +
   args:
     executable: /bin/bash
   changed_when: false

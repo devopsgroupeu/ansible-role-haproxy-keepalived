@@ -26,6 +26,7 @@ keepalived_vrrp_instances:
   - vrrp_instance_name: VI_TEST2
     virtual_ipaddress: "172.18.0.101"
     virtual_router_id: 52
+    advert_int: 3   # per-instance override (argument_specs must accept it)
 keepalived_auth_type: PASS
 keepalived_auth_pass: "vrrpsec"
 haproxy_frontends:
@@ -50,6 +51,41 @@ haproxy_backends:
     servers:
       - backend1
     port: 80
+    options:
+      - check
+  # http_check alone must still render "option httpchk"
+  - name: be_http_check_only
+    mode: http
+    http_check:
+      send:
+        method: GET
+        uri: /
+      expect: status 200
+    servers:
+      - backend1
+    port: 80
+    options:
+      - check
+  # httpcheck_method must become "http-check send meth", not the URI
+  - name: be_httpcheck_method
+    mode: http
+    httpcheck: true
+    httpcheck_method: GET
+    servers:
+      - backend1
+    port: 80
+    options:
+      - check
+# The documented listen schema (docs/INTEGRATION.md): port only, no listen_port
+haproxy_listens:
+  - name: mysql
+    address: "*"
+    port: 3306
+    mode: tcp
+    balance: leastconn
+    servers:
+      - name: mysql01
+        address: 127.0.0.1
     options:
       - check
 haproxy_global_extra: |

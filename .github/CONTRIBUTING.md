@@ -50,6 +50,12 @@ ansible-lint --profile production
 molecule test -s default
 ```
 
+CI also runs `package` (including `MOLECULE_DISTRO=rockylinux9`),
+`package-branch`, `source` (`debian12`, `debian13`), `ssl` and `cloud-fip`;
+`failover` runs weekly and on demand. Pick the image with `MOLECULE_DISTRO`
+(`ubuntu2404`, `debian12`, `debian13`, `rockylinux9`), e.g.
+`MOLECULE_DISTRO=debian13 molecule test -s source`.
+
 If your change is non-trivial, open an issue first so we can discuss the approach.
 
 ## Obvious Fix Policy
@@ -65,12 +71,12 @@ You do not need to open an issue for:
 
 We follow [Conventional Commits](https://www.conventionalcommits.org/):
 
-- `feat:` — new feature
-- `fix:` — bug fix
-- `docs:` — documentation only
-- `refactor:` — code restructuring without feature change
-- `test:` — Molecule / CI changes
-- `chore:` — maintenance (deps, lint config, etc.)
+- `feat:` - new feature
+- `fix:` - bug fix
+- `docs:` - documentation only
+- `refactor:` - code restructuring without feature change
+- `test:` - Molecule / CI changes
+- `chore:` - maintenance (deps, lint config, etc.)
 
 Breaking changes: append `!` after the type (e.g. `feat!:`) and add a
 `BREAKING CHANGE:` footer.
@@ -95,4 +101,4 @@ Report them privately by email at info@devopsgroup.sk.
 
 ## Community
 
-Maintained by [DevOpsGroup s.r.o.](https://devopsgroup.sk/) — info@devopsgroup.sk
+Maintained by [DevOpsGroup s.r.o.](https://devopsgroup.sk/) - info@devopsgroup.sk

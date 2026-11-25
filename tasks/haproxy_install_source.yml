@@ -1,28 +1,4 @@
 ---
-- name: Install HAProxy build toolchain (RHEL family)
-  ansible.builtin.package:
-    name:
-      - make
-      - gcc
-      - lua-devel
-      - openssl-devel
-      - pcre2-devel
-      - zlib-devel
-    state: present
-  when: ansible_facts['os_family'] == 'RedHat'
-
-- name: Install HAProxy build toolchain (Debian/Ubuntu)
-  ansible.builtin.package:
-    name:
-      - build-essential
-      - gcc
-      - liblua5.4-dev
-      - libssl-dev
-      - libpcre2-dev
-      - zlib1g-dev
-    state: present
-  when: ansible_facts['os_family'] == 'Debian'
-
 - name: Check HAProxy installation status (source)
   block:
     - name: Get installed HAProxy version
@@ -49,9 +25,41 @@
       {{ (installed_haproxy_version | default('') | length == 0)
          or (installed_haproxy_version is version(haproxy_version, '!=')) }}
 
+# Reset on every role run, so a later application of the role in the same
+# playbook does not restart HAProxy again for an install it did not do.
+- name: Reset the HAProxy binary change flag
+  ansible.builtin.set_fact:
+    haproxy_source_changed: false
+
 - name: Install HAProxy from source if required
   when: haproxy_installation_required
   block:
+    # lua-devel is only in the EL9 CRB / CodeReady Builder repo.
+    - name: Install HAProxy build toolchain (RHEL family)
+      ansible.builtin.dnf:
+        enablerepo: "{{ haproxy_el_builder_repo }}"
+        name:
+          - make
+          - gcc
+          - lua-devel
+          - openssl-devel
+          - pcre2-devel
+          - zlib-devel
+        state: present
+      when: ansible_facts['os_family'] == 'RedHat'
+
+    - name: Install HAProxy build toolchain (Debian/Ubuntu)
+      ansible.builtin.package:
+        name:
+          - build-essential
+          - gcc
+          - liblua5.4-dev
+          - libssl-dev
+          - libpcre2-dev
+          - zlib1g-dev
+        state: present
+      when: ansible_facts['os_family'] == 'Debian'
+
     - name: Set HAProxy source filename vars
       ansible.builtin.set_fact:
         haproxy_major_minor: "{{ haproxy_version | regex_replace('^(\\d+\\.\\d+).*', '\\1') }}"
@@ -73,8 +81,6 @@
         dest: "{{ haproxy_install_dir }}/{{ haproxy_src_filename }}"
         mode: "0644"
       when: haproxy_offline_install | bool
-      notify:
-        - Restart haproxy
 
     - name: Download HAProxy source on the target (online)
       ansible.builtin.get_url:
@@ -83,8 +89,6 @@
         mode: "0644"
         checksum: "{{ haproxy_src_sha256 }}"
       when: not (haproxy_offline_install | bool)
-      notify:
-        - Restart haproxy
 
     - name: Extract HAProxy source
       ansible.builtin.unarchive:
@@ -114,6 +118,12 @@
       register: haproxy_install
       changed_when: haproxy_install.rc == 0
 
+    # Consumed by "Apply HAProxy configuration change" in haproxy.yml so a
+    # running HAProxy is restarted onto the new binary in the same play.
+    - name: Flag HAProxy binary change for restart
+      ansible.builtin.set_fact:
+        haproxy_source_changed: "{{ haproxy_install is changed }}"
+
     - name: Generate systemd service HAProxy file
       ansible.builtin.command:
         cmd: make haproxy.service
@@ -131,15 +141,13 @@
         remote_src: true
       notify: Reload systemd
 
-- name: Remove HAProxy build toolchain after source install
-  ansible.builtin.package:
-    name:
-      - gcc
-      - make
-    state: absent
-  when:
-    - haproxy_remove_build_deps | bool
-    - haproxy_compile is defined and haproxy_compile is changed
+    - name: Remove HAProxy build toolchain after source install
+      ansible.builtin.package:
+        name:
+          - gcc
+          - make
+        state: absent
+      when: haproxy_remove_build_deps | bool
 
 # The source-built systemd unit starts HAProxy with `-f $CONFIG -f $CFGDIR`
 # (CFGDIR=/etc/haproxy/conf.d). HAProxy refuses to start if that directory is

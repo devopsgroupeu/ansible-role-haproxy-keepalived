@@ -1,6 +1,6 @@
 # Architecture
 
-Visual reference for the HAProxy + Keepalived role — how components are laid out, how traffic flows, how failover works, and how the Ansible role executes.
+Visual reference for the HAProxy + Keepalived role - how components are laid out, how traffic flows, how failover works, and how the Ansible role executes.
 
 ---
 
@@ -16,19 +16,19 @@ Visual reference for the HAProxy + Keepalived role — how components are laid o
 
 ## HA Topology
 
-Active-passive setup: both nodes run HAProxy; Keepalived assigns the VIP to the master. If the master fails, the VIP moves to the backup within 2–3 seconds.
+Active-passive setup: both nodes run HAProxy; Keepalived assigns the VIP to the master. If the master fails, the VIP moves to the backup within 2-3 seconds.
 
 ```mermaid
 graph TD
     Client(["Client"])
     VIP["Virtual IP (VIP)\nfloating address"]
 
-    subgraph proxy-01 ["proxy-01 — MASTER (priority 100)"]
+    subgraph proxy-01 ["proxy-01 - MASTER (priority 100)"]
         K1["Keepalived\nVRRP state: MASTER"]
         H1["HAProxy\n:80 / :443 / :6443"]
     end
 
-    subgraph proxy-02 ["proxy-02 — BACKUP (priority 90)"]
+    subgraph proxy-02 ["proxy-02 - BACKUP (priority 90)"]
         K2["Keepalived\nVRRP state: BACKUP"]
         H2["HAProxy\n:80 / :443 / :6443"]
     end
@@ -79,7 +79,7 @@ flowchart LR
     BE -->|"check"| HC
     HC -.->|"healthy"| S1
     HC -.->|"healthy"| S2
-    HC -.->|"unhealthy — skipped"| S3
+    HC -.->|"unhealthy - skipped"| S3
     BE -->|"forward"| S1
     BE -->|"forward"| S2
 ```
@@ -97,7 +97,7 @@ sequenceDiagram
     participant Master as proxy-01 (MASTER)
     participant Backup as proxy-02 (BACKUP)
 
-    Note over Master,Backup: Normal operation — proxy-01 holds VIP
+    Note over Master,Backup: Normal operation - proxy-01 holds VIP
 
     Client->>VIP: HTTP request
     VIP->>Master: forwarded
@@ -107,9 +107,9 @@ sequenceDiagram
     Master->>Master: Keepalived detects failure
     Master->>Backup: VRRP: no more advertisements
 
-    Note over Backup: No VRRP seen — election starts
+    Note over Backup: No VRRP seen - election starts
     Backup->>Backup: Priority 90 wins by default
-    Backup->>VIP: Gratuitous ARP — take over VIP
+    Backup->>VIP: Gratuitous ARP - take over VIP
 
     Note over VIP: VIP now owned by proxy-02
 
@@ -192,7 +192,7 @@ flowchart TD
     Configure VRRP notify hooks
     Reload keepalived"]
 
-    Done(["Done — HA load balancer active"])
+    Done(["Done - HA load balancer active"])
 
     Start --> Validate
     Validate --> Setup

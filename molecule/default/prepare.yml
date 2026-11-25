@@ -10,13 +10,24 @@
   become: false
   gather_facts: true
   tasks:
+    # The geerlingguy images ship /usr/sbin/policy-rc.d with "exit 101", which
+    # stops package postinst scripts from starting services. Real hosts start
+    # HAProxy on the stock config at install time; remove the shim so the role
+    # is tested against that behaviour.
+    - name: Allow package installs to start services (Debian/Ubuntu)
+      ansible.builtin.file:
+        path: /usr/sbin/policy-rc.d
+        state: absent
+      become: true
+      when: ansible_facts['os_family'] == 'Debian'
+
     - name: Fix PAM authentication for Rocky Linux
       ansible.builtin.lineinfile:
         path: /etc/pam.d/su
         regexp: '^account\s+required\s+pam_access.so'
         state: absent
       become: true
-      when: ansible_os_family == 'RedHat'
+      when: ansible_facts['os_family'] == 'RedHat'
       failed_when: false
 
     - name: Install basic requirements (Debian/Ubuntu)
@@ -25,7 +36,7 @@
           - iproute2
         state: present
       become: true
-      when: ansible_os_family == 'Debian'
+      when: ansible_facts['os_family'] == 'Debian'
 
     - name: Install basic requirements (Rocky/RHEL)
       ansible.builtin.package:
@@ -33,7 +44,7 @@
           - iproute
         state: present
       become: true
-      when: ansible_os_family == 'RedHat'
+      when: ansible_facts['os_family'] == 'RedHat'
 
     - name: Ensure systemd is running
       ansible.builtin.service:

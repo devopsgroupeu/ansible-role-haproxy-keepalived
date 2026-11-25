@@ -51,12 +51,22 @@ provisioner:
         keepalived_install_method: source
         # Pin the compiled versions + verified upstream checksums so the build is
         # reproducible and the source download is integrity-checked.
-        haproxy_version: "3.4.1"
-        haproxy_src_sha256: "sha256:2e62c4ce4fd77d3bc7cf17e586431663454456a078b7c8465b8f0125b5bc22f8"
-        keepalived_version: "2.4.1"
-        keepalived_src_sha256: "sha256:5afe09d3730152b96cea66c97ea8cc5ee172a4c237e79804503efa8d5b0f8ba1"
+        haproxy_version: "3.4.8"
+        haproxy_src_sha256: "sha256:024bd521a6cbbe32b426853147e6bbd6a89b107c5a34144846193fee5b7c6ed1"
+        keepalived_version: "2.4.3"
+        keepalived_src_sha256: "sha256:a0faef8e401c143487b131b526df7541c1e33d9b8814642fa9dfe8bb250a9632"
         haproxy_stats_page_pass: "test_password_123456"
+        # The toolchain must be installed and removed only on compiling runs,
+        # or idempotence fails.
+        haproxy_remove_build_deps: true
+        # Non-default group and a non-loopback stats bind: the tasks must
+        # honour both (directory groups, readiness checks).
+        haproxy_group: lbproxy
+        haproxy_stats_bind_addr: "{{ ansible_facts['default_ipv4']['address'] }}"
         keepalived_network_interface: eth0
+        # Non-default config dir: the template validates this file and the
+        # systemd drop-in must point keepalived at it.
+        keepalived_config_dir: /etc/keepalived-custom
         keepalived_vrrp_instances:
           - vrrp_instance_name: VI_SRC
             virtual_ipaddress: "172.18.0.230"

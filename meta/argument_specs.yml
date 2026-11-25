@@ -12,12 +12,18 @@ argument_specs:
     options:
       haproxy_loadbalancer_master:
         type: str
-        required: true
-        description: inventory_hostname of the master proxy node.
+        required: false
+        default: ""
+        description: >
+          inventory_hostname of the master proxy node. Required (and validated)
+          when keepalived_enabled is true.
       haproxy_loadbalancer_backup:
         type: str
-        required: true
-        description: inventory_hostname of the backup proxy node.
+        required: false
+        default: ""
+        description: >
+          inventory_hostname of the backup proxy node. Required (and validated)
+          when keepalived_enabled is true.
       haproxy_enabled:
         type: bool
         required: false
@@ -26,7 +32,7 @@ argument_specs:
       haproxy_version:
         type: str
         required: false
-        default: "3.4.1"
+        default: "3.4.8"
         description: HAProxy source version (used only when haproxy_install_method=source).
       haproxy_install_method:
         type: str
@@ -41,9 +47,12 @@ argument_specs:
         required: false
         default: ""
         description: >
-          Optional repo branch for package mode (e.g. "3.0" or "3.4"). Selects
-          the vbernat PPA (Ubuntu) or haproxy.debian.net backport (Debian) for
-          that branch. Empty = use the distribution's default HAProxy package.
+          Optional repo branch for package mode (e.g. "3.2"). Selects the
+          vbernat PPA (Ubuntu) or haproxy.debian.net backport (Debian) for that
+          branch and installs haproxy=<branch>.*, which also moves an existing
+          install. Available: noble 3.0/3.2, bookworm 3.0/3.2, trixie 3.2/3.4;
+          Debian/Ubuntu only. Empty = use the distribution's default HAProxy
+          package.
       haproxy_binary:
         type: str
         required: false
@@ -61,32 +70,45 @@ argument_specs:
           - "USE_PCRE2=1"
           - "USE_LUA=1"
           - "USE_SLZ=1"
-          - "USE_SYSTEMD=1"
           - "USE_PROMEX=1"
           - "USE_PCRE2_JIT=1"
         description: >
           Base set of make flags for source-mode HAProxy builds. This is the
-          baseline; haproxy_make_flags is the override point where QUIC flags
-          are appended conditionally. Override haproxy_make_flags to fully
+          baseline; haproxy_make_flags is the override point where
+          USE_SYSTEMD (HAProxy < 3.1) and QUIC flags are appended conditionally. Override haproxy_make_flags to fully
           customize the build without touching this base.
       haproxy_make_flags:
         type: raw
         required: false
-        default: "{{ haproxy_make_flags_default + (['USE_QUIC=1', 'USE_QUIC_OPENSSL_COMPAT=1'] if haproxy_version is version('2.9', '>=') else []) }}"
+        default: "{{ haproxy_make_flags_default + (['USE_SYSTEMD=1'] if haproxy_version is version('3.1', '<') else []) + (['USE_QUIC=1', 'USE_QUIC_OPENSSL_COMPAT=1'] if haproxy_version is version('2.9', '>=') else []) }}"
         description: >
           Final list of make flags passed to the HAProxy build. Defaults to
-          haproxy_make_flags_default plus QUIC flags on HAProxy >= 2.9.
+          haproxy_make_flags_default plus USE_SYSTEMD=1 on HAProxy < 3.1 and
+          QUIC flags on HAProxy >= 2.9.
           Override this var (not haproxy_make_flags_default) to fully replace
           the flag set.
       haproxy_src_sha256:
         type: str
         required: false
-        default: "sha256:2e62c4ce4fd77d3bc7cf17e586431663454456a078b7c8465b8f0125b5bc22f8"
+        default: "sha256:024bd521a6cbbe32b426853147e6bbd6a89b107c5a34144846193fee5b7c6ed1"
         description: >
           SHA256 checksum for the HAProxy source tarball; required when
           haproxy_install_method=source. Accepts "sha256:<hex>" or a remote
           ".sha256" URL. haproxy.org publishes a sidecar checksum file next
           to each release tarball.
+      haproxy_el_builder_repo:
+        type: str
+        required: false
+        default: >-
+          {{ 'codeready-builder-for-rhel-9-' ~ ansible_facts['architecture'] ~ '-rpms'
+          if ansible_facts['distribution'] == 'RedHat'
+          else 'ol9_codeready_builder' if ansible_facts['distribution'] == 'OracleLinux'
+          else 'crb' }}
+        description: >
+          EL9 repository enabled for the source-build toolchain install, which
+          needs lua-devel: crb on Rocky/Alma Linux, ol9_codeready_builder on
+          Oracle Linux, codeready-builder-for-rhel-9-<arch>-rpms on RHEL.
+          Source mode only.
       haproxy_remove_build_deps:
         type: bool
         required: false
@@ -132,6 +154,15 @@ argument_specs:
           Complete HAProxy configuration as a literal string. When set, overrides
           all dynamically generated configuration. Use for advanced custom configs
           or migration from an existing setup.
+      haproxy_selinux_connect_any:
+        type: bool
+        required: false
+        default: true
+        description: >
+          On EL9 with SELinux enabled, set the persistent haproxy_connect_any
+          boolean so HAProxy may bind and connect to any port (the policy only
+          allows a few HTTP ports). Ignored when SELinux is disabled and on
+          Debian/Ubuntu.
       haproxy_user:
         type: str
         required: false
@@ -315,6 +346,15 @@ argument_specs:
         required: false
         default: false
         description: Drop the rsyslog UDP receiver and rely on journald.
+      haproxy_config_change_action:
+        type: str
+        required: false
+        default: restarted
+        choices: [restarted, reloaded]
+        description: >-
+          How a config or certificate change is applied to a running HAProxy. reloaded is used
+          only when the replaced config was already role-managed; the first takeover of the
+          stock config and a new source-built binary always restart.
       haproxy_config_dir:
         type: str
         required: false
@@ -348,12 +388,12 @@ argument_specs:
       keepalived_version:
         type: str
         required: false
-        default: "2.4.1"
+        default: "2.4.3"
         description: Keepalived source version (used only when keepalived_install_method=source).
       keepalived_src_sha256:
         type: str
         required: false
-        default: "sha256:5afe09d3730152b96cea66c97ea8cc5ee172a4c237e79804503efa8d5b0f8ba1"
+        default: "sha256:a0faef8e401c143487b131b526df7541c1e33d9b8814642fa9dfe8bb250a9632"
         description: >
           SHA256 checksum for the Keepalived source tarball; required when
           keepalived_install_method=source. Accepts "sha256:<hex>" or a remote
@@ -430,7 +470,7 @@ argument_specs:
         default: []
         description: >-
           VRRP instances (one floating VIP each). Required (non-empty) only when
-          keepalived_enabled is true — enforced conditionally in validate.yml.
+          keepalived_enabled is true - enforced conditionally in validate.yml.
         options:
           vrrp_instance_name:
             type: str
@@ -453,6 +493,32 @@ argument_specs:
             required: false
             choices: [MASTER, BACKUP]
             description: Initial VRRP state override (default auto).
+          advert_int:
+            type: int
+            required: false
+            description: Per-instance override of keepalived_advert_int.
+          vrrp_version:
+            type: int
+            required: false
+            choices: [2, 3]
+            description: Per-instance override of keepalived_vrrp_version.
+          preempt_delay:
+            type: int
+            required: false
+            description: Per-instance override of keepalived_preempt_delay.
+          garp_master_delay:
+            type: int
+            required: false
+            description: Per-instance override of keepalived_garp_master_delay.
+          garp_master_refresh:
+            type: int
+            required: false
+            description: Per-instance override of keepalived_garp_master_refresh.
+          auth_pass:
+            type: str
+            required: false
+            no_log: true
+            description: Per-instance override of keepalived_auth_pass (1-8 characters).
       keepalived_peer_group:
         type: str
         required: false
@@ -473,7 +539,12 @@ argument_specs:
         type: int
         required: false
         default: 0
-        description: Seconds to delay preemption (0 = instant; ignored when nopreempt is true).
+        description: >-
+          Seconds to delay preemption (0 = instant; ignored when nopreempt is
+          true). A positive value renders both nodes with initial state BACKUP,
+          as keepalived requires; priority still elects the master. The master
+          may hold the VIP only after the delay, so the role skips its master
+          VIP check (as with nopreempt).
       keepalived_advert_int:
         type: int
         required: false
@@ -484,7 +555,7 @@ argument_specs:
         required: false
         default: 2
         choices: [2, 3]
-        description: VRRP protocol version (use 3 for IPv6 VIPs).
+        description: VRRP protocol version.
       keepalived_garp_master_delay:
         type: int
         required: false

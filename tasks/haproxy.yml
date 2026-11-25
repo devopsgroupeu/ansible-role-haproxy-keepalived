@@ -7,7 +7,7 @@
     path: "{{ haproxy_config_dir }}/certs"
     state: directory
     owner: root
-    group: haproxy
+    group: "{{ haproxy_group }}"
     mode: "0750"
 
 - name: Deploy SSL certificates
@@ -15,16 +15,34 @@
     src: "{{ haproxy_ssl_cert_src }}"
     dest: "{{ haproxy_config_dir }}/certs/"
     owner: root
-    group: haproxy
+    group: "{{ haproxy_group }}"
     mode: "0640"
+    directory_mode: "0750"
+  # PEM bundles carry private keys: keep them out of --diff and -v output.
+  diff: false
+  no_log: true
+  # Applied in-play by "Apply HAProxy configuration change" below.
+  register: haproxy_cert_result
   when: haproxy_ssl_cert_src | length > 0
+
+# /run is a tmpfs and nothing recreates the admin socket directory at boot on
+# EL9 or for the source-built unit; Debian's vendor rule recreates it with a
+# different mode. The file below shadows /usr/lib/tmpfiles.d/haproxy.conf.
+- name: Persist HAProxy runtime directories across reboots
+  ansible.builtin.template:
+    src: haproxy-tmpfiles.conf.j2
+    dest: /etc/tmpfiles.d/haproxy.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Apply HAProxy tmpfiles rules
 
 - name: Create HAProxy socket directory
   ansible.builtin.file:
     path: "{{ haproxy_socket_dir }}"
     state: directory
     owner: root
-    group: haproxy
+    group: "{{ haproxy_group }}"
     mode: "0750"
 
 - name: Create HAProxy admin socket directory
@@ -35,20 +53,41 @@
     group: "{{ haproxy_group }}"
     mode: "0750"
 
+# A reload is only safe over a config this role wrote: the package-started
+# stock process is always restarted (see "Apply HAProxy configuration change").
+# Matches the fixed marker line of templates/haproxy.cfg.j2, not ansible_managed
+# (its config setting is deprecated, and a customised value renders expanded).
+- name: Check whether the deployed HAProxy config is role-managed
+  ansible.builtin.command:
+    argv:
+      - grep
+      - -qxF
+      - "# managed-by: devopsgroupeu.haproxy_keepalived"
+      - "{{ haproxy_config_dir }}/haproxy.cfg"
+  register: haproxy_config_managed
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  when: haproxy_config_change_action == 'reloaded'
+
 - name: Copy HAProxy configuration
   ansible.builtin.template:
     src: haproxy.cfg.j2
     dest: "{{ haproxy_config_dir }}/haproxy.cfg"
-    mode: "0644"
+    # The config holds the stats credentials: readable by root and the
+    # HAProxy group only.
+    owner: root
+    group: "{{ haproxy_group }}"
+    mode: "0640"
     validate: "{{ haproxy_binary }} -f %s -c"
     backup: true
   no_log: true  # config renders the stats password; suppress --diff/-v leakage
+  register: haproxy_config_result
+  # The config change is applied in-play by "Apply HAProxy configuration
+  # change" below, not by a deferred handler: the readiness checks that follow
+  # must run against the new config, and a handler lost to a failed check would
+  # never fire again on rerun.
   notify:
-    # Restart (not reload) on config change: the package auto-starts HAProxy on
-    # the default config, and a soft reload over that process can leave the new
-    # frontends unbound (no listening sockets). Only fires when the config
-    # changes, so it stays idempotent.
-    - Restart haproxy
     - Cleanup haproxy config backups
 
 - name: Configure the rsyslog configuration file to accept UDP syslog reception
@@ -57,14 +96,24 @@
     src: haproxy-rsyslog.conf.j2
     dest: "/etc/rsyslog.d/haproxy.conf"
     mode: "0644"
-  notify: Restart rsyslog
+  register: haproxy_rsyslog_result
 
 - name: Remove rsyslog HAProxy config when logging via journald
   when: haproxy_journald | bool
   ansible.builtin.file:
     path: /etc/rsyslog.d/haproxy.conf
     state: absent
-  notify: Restart rsyslog
+  register: haproxy_rsyslog_removed
+
+# In-play, not a deferred handler: a failed readiness check below would drop
+# the handler and the rerun would never re-notify it, leaving rsyslog without
+# the UDP receiver.
+- name: Restart rsyslog after an HAProxy rule change
+  when: haproxy_rsyslog_result is changed or haproxy_rsyslog_removed is changed
+  ansible.builtin.systemd_service:
+    name: rsyslog
+    state: restarted
+    enabled: true
 
 - name: Ensure HAProxy service is running
   ansible.builtin.systemd_service:
@@ -74,9 +123,47 @@
     # Source mode deploys a generated unit whose daemon-reload is a deferred
     # handler; reload here so systemd has registered it before this start.
     daemon_reload: true
+  register: haproxy_service_start
+
+# Restart by default; reload only when haproxy_config_change_action is
+# reloaded and the replaced config was already role-managed. The package
+# auto-starts HAProxy on the default config, and a soft reload over that
+# process can leave the new frontends unbound (no listening sockets); a new
+# source-built binary also restarts. Skipped when the task above just started
+# the service, because it already runs the new config and binary: keyed on the
+# state it found (status is read before acting), because that task also reports
+# changed when it only enabled a running unit. One host at a time, so both load
+# balancers never drop connections in the same second.
+- name: Apply HAProxy configuration change
+  ansible.builtin.systemd_service:
+    name: haproxy
+    state: >-
+      {{ 'reloaded'
+         if haproxy_config_change_action == 'reloaded'
+            and (haproxy_config_managed.rc | default(1)) == 0
+            and not (haproxy_source_changed | default(false) | bool)
+         else 'restarted' }}
+    daemon_reload: true
+  throttle: 1
+  when:
+    - >-
+      haproxy_config_result is changed
+      or haproxy_cert_result is changed
+      or haproxy_source_changed | default(false) | bool
+    - haproxy_service_start.status.ActiveState | default('') in ['active', 'activating']
+
+# Probe the stats listener where it is bound: loopback for wildcard binds,
+# otherwise the configured address (bracketed in the URL when IPv6).
+- name: Determine the HAProxy stats check address
+  ansible.builtin.set_fact:
+    haproxy_stats_check_host: >-
+      {{ '127.0.0.1' if haproxy_stats_bind_addr in ['*', '0.0.0.0', '::', '']
+         else haproxy_stats_bind_addr }}
+  when: haproxy_stats | bool
 
 - name: Wait for HAProxy to be ready
   ansible.builtin.wait_for:
+    host: "{{ haproxy_stats_check_host }}"
     port: "{{ haproxy_stats_port }}"
     delay: 2
     timeout: 30
@@ -84,7 +171,9 @@
 
 - name: Verify HAProxy is responding
   ansible.builtin.uri:
-    url: "http://127.0.0.1:{{ haproxy_stats_port }}{{ haproxy_stats_page_uri }}"
+    url: >-
+      http://{{ '[' ~ haproxy_stats_check_host ~ ']' if ':' in haproxy_stats_check_host
+      else haproxy_stats_check_host }}:{{ haproxy_stats_port }}{{ haproxy_stats_page_uri }}
     user: "{{ haproxy_stats_page_user }}"
     password: "{{ haproxy_stats_page_pass }}"
     force_basic_auth: true

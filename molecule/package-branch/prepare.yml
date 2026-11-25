@@ -1,0 +1,25 @@
+---
+- name: Prepare package-branch test environment
+  hosts: all
+  become: true
+  gather_facts: true
+  tasks:
+    # Real hosts start HAProxy at package install time; the image's
+    # policy-rc.d shim ("exit 101") would hide that.
+    - name: Allow package installs to start services
+      ansible.builtin.file:
+        path: /usr/sbin/policy-rc.d
+        state: absent
+
+    - name: Install iproute2 and the distribution HAProxy
+      ansible.builtin.apt:
+        name:
+          - iproute2
+          - haproxy
+        state: present
+        update_cache: true
+
+    - name: Ensure systemd-journald is running
+      ansible.builtin.service:
+        name: systemd-journald
+        state: started

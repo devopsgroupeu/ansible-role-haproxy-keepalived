@@ -17,12 +17,12 @@ Or pin a version via `requirements.yml`:
 roles:
   - name: devopsgroupeu.haproxy-keepalived
     src: https://github.com/devopsgroupeu/ansible-role-haproxy-keepalived
-    version: "v1.0.0"
+    version: "v1.2.0"
     scm: git
 ```
 
 The floating VIP defined in `keepalived_vrrp_instances[].virtual_ipaddress` becomes the
-stable address that clients use to reach whatever backend HAProxy fronts — for example a
+stable address that clients use to reach whatever backend HAProxy fronts - for example a
 Kubernetes API endpoint, your application servers, or any TCP/HTTP service.
 
 ## Kubernetes / Container Platform Integration
@@ -108,7 +108,7 @@ cloud_server_name: "{{ inventory_hostname }}"
 ### Other cloud providers
 
 The bundled notify script speaks the Hetzner Cloud API. For other providers
-(DigitalOcean, AWS Elastic IP, etc.) supply your own notify script — set
+(DigitalOcean, AWS Elastic IP, etc.) supply your own notify script - set
 `cloud_floating_ip_enabled: false` and call your custom script from a Keepalived
 `notify` stanza instead.
 
@@ -204,16 +204,24 @@ chmod 600 /etc/haproxy/certs/example.com.pem
 
 ## Monitoring Integration
 
-### Prometheus Exporter
+### Prometheus Metrics
 
-Install HAProxy exporter:
+No external exporter is needed: with `haproxy_stats: true` the stats listener
+serves HAProxy's built-in Prometheus exporter at `/metrics` (no basic auth, so
+keep `haproxy_stats_bind_addr` on loopback or a firewalled address):
+
 ```bash
-wget https://github.com/prometheus/haproxy_exporter/releases/download/v0.15.0/haproxy_exporter-0.15.0.linux-amd64.tar.gz
-tar xvf haproxy_exporter-0.15.0.linux-amd64.tar.gz
-cp haproxy_exporter-0.15.0.linux-amd64/haproxy_exporter /usr/local/bin/
+curl -s http://127.0.0.1:1936/metrics | head
+```
 
-# Run exporter
-haproxy_exporter --haproxy.scrape-uri="http://admin:password@localhost:1936/haproxy/stats;csv"
+Scrape it from a local agent, or bind the stats listener to a monitoring
+network address:
+
+```yaml
+scrape_configs:
+  - job_name: haproxy
+    static_configs:
+      - targets: ["10.0.0.2:1936", "10.0.0.3:1936"]
 ```
 
 ### Grafana Dashboard
@@ -256,14 +264,14 @@ the Ansible controller and point the role at it with the offline variables:
 
 ```bash
 # On an internet-connected machine
-wget https://www.haproxy.org/download/3.4/src/haproxy-3.4.0.tar.gz
+wget https://www.haproxy.org/download/3.4/src/haproxy-3.4.8.tar.gz
 ```
 
 ```yaml
 # group_vars or host_vars
 haproxy_install_method: source
 haproxy_offline_install: true
-haproxy_src_local_path: "/path/on/controller/haproxy-3.4.0.tar.gz"
+haproxy_src_local_path: "/path/on/controller/haproxy-3.4.8.tar.gz"
 ```
 
 The role copies the tarball from the controller path to `haproxy_install_dir` on

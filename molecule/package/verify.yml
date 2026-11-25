@@ -21,15 +21,31 @@
         fail_msg: "Package-mode services not running"
         success_msg: "Package-mode HAProxy + Keepalived running"
 
+    # The running HAProxy must serve the role's config, not the stock one a
+    # package install started (a lost or deferred apply leaves no role
+    # listeners).
+    - name: Read listening TCP sockets
+      ansible.builtin.command: ss -Hltn
+      register: hkv_listen
+      changed_when: false
+
+    - name: Every role frontend, listen and stats port is listening
+      ansible.builtin.assert:
+        that:
+          - hkv_listen.stdout_lines | select('search', ':' ~ item ~ '\\s') | list | length > 0
+        fail_msg: "Nothing listens on port {{ item }}: {{ hkv_listen.stdout_lines }}"
+        success_msg: "Port {{ item }} is listening"
+      loop: "{{ haproxy_frontends | map(attribute='port') | list + [1936] }}"
+
     # The geerlingguy test image ships with gcc pre-installed.
     # We check for source-specific build deps (liblua5.4-dev, libpcre2-dev)
-    # that the role installs only in source mode — those prove no source path leaked.
+    # that the role installs only in source mode - those prove no source path leaked.
     - name: Check for liblua5.4-dev (source-only HAProxy build dep, Debian/Ubuntu)
       ansible.builtin.command: dpkg -s liblua5.4-dev
       register: lua_dev_pkg
       changed_when: false
       failed_when: false
-      when: ansible_os_family == 'Debian'
+      when: ansible_facts['os_family'] == 'Debian'
 
     - name: Assert source-specific build deps absent in package mode (Debian/Ubuntu)
       ansible.builtin.assert:
@@ -37,7 +53,7 @@
           - lua_dev_pkg.rc != 0
         fail_msg: "liblua5.4-dev present in package mode (source build deps leaked)"
         success_msg: "Source-specific build deps absent in package mode"
-      when: ansible_os_family == 'Debian'
+      when: ansible_facts['os_family'] == 'Debian'
 
     - name: Validate HAProxy configuration syntax
       ansible.builtin.command: haproxy -c -f /etc/haproxy/haproxy.cfg
@@ -51,3 +67,86 @@
           - hap_syntax.rc == 0
         fail_msg: "HAProxy configuration syntax invalid in package mode"
         success_msg: "HAProxy configuration valid in package mode"
+
+    # /run/haproxy is lost on reboot; only the role's tmpfiles rule brings it
+    # back on EL9 before HAProxy binds admin.sock.
+    - name: Simulate a reboot of /run/haproxy and restart HAProxy
+      ansible.builtin.shell: |
+        set -o pipefail
+        rm -rf /run/haproxy
+        systemd-tmpfiles --create haproxy.conf
+        systemctl restart haproxy
+        stat -c %a:%U:%G /run/haproxy
+      args:
+        executable: /bin/bash
+      register: hkv_tmpfiles_reboot
+      changed_when: true
+
+    - name: Read the HAProxy state after the restart
+      ansible.builtin.systemd_service:
+        name: haproxy
+      register: hkv_hap_active
+
+    - name: Assert HAProxy runs with a recreated admin socket directory
+      ansible.builtin.assert:
+        that:
+          - hkv_hap_active.status.ActiveState == 'active'
+          - hkv_tmpfiles_reboot.stdout == '750:root:haproxy'
+        fail_msg: "haproxy {{ hkv_hap_active.status.ActiveState }}, /run/haproxy {{ hkv_tmpfiles_reboot.stdout }}"
+        success_msg: "/run/haproxy recreated by tmpfiles; HAProxy active"
+
+    # SELinux is disabled in the container (and absent on Debian/Ubuntu), so
+    # the haproxy_connect_any tasks must have been skipped: they would have
+    # installed python3-libsemanage, and seboolean fails without SELinux.
+    - name: Gather package facts (RHEL family)
+      ansible.builtin.package_facts:
+      when: ansible_facts['os_family'] == 'RedHat'
+
+    - name: Assert the SELinux tasks were skipped with SELinux disabled
+      ansible.builtin.assert:
+        that:
+          - (ansible_facts['selinux'] | default({})).get('status', 'disabled') != 'enabled'
+          - "'python3-libsemanage' not in ansible_facts['packages']"
+        fail_msg: "SELinux tasks ran although SELinux is not enabled"
+        success_msg: "SELinux tasks skipped (SELinux not enabled)"
+      when: ansible_facts['os_family'] == 'RedHat'
+
+# Every configured VIP must be held by exactly one load balancer, compared as
+# exact addresses (preemption is on, so the master is the holder).
+- name: Verify VIP assignment
+  hosts: proxy_hosts
+  become: true
+  gather_facts: false
+  vars:
+    hkv_vips: >-
+      {{ keepalived_vrrp_instances | map(attribute='virtual_ipaddress')
+         | map('regex_replace', '/.*$', '') | list }}
+  tasks:
+    - name: Read interface addresses
+      ansible.builtin.command: ip -o addr show
+      register: hkv_addr
+      changed_when: false
+
+    - name: Collect the VIPs held by this node
+      ansible.builtin.set_fact:
+        hkv_held_vips: >-
+          {{ hkv_addr.stdout | regex_findall('inet ([0-9.]+)/') | intersect(hkv_vips) }}
+
+    - name: Each VIP is on exactly one node
+      vars:
+        hkv_all_held: >-
+          {{ ansible_play_hosts | map('extract', hostvars, 'hkv_held_vips') | flatten }}
+      ansible.builtin.assert:
+        that:
+          - hkv_all_held | sort == hkv_vips | sort
+        fail_msg: "VIPs {{ hkv_vips }} held as {{ ansible_play_hosts | zip(ansible_play_hosts | map('extract', hostvars, 'hkv_held_vips')) | list }}"
+        success_msg: "Each VIP is held by exactly one node"
+      run_once: true
+
+    - name: The master holds every VIP
+      ansible.builtin.assert:
+        that:
+          - hkv_held_vips | sort == hkv_vips | sort
+        fail_msg: "Master holds {{ hkv_held_vips }}, expected {{ hkv_vips }}"
+        success_msg: "Master holds every VIP"
+      when: inventory_hostname == haproxy_loadbalancer_master

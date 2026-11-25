@@ -4,27 +4,39 @@
   become: true
   gather_facts: true
   tasks:
+    # The geerlingguy images ship /usr/sbin/policy-rc.d with "exit 101", which
+    # stops package postinst scripts from starting services. Real hosts start
+    # HAProxy on the stock config at install time; remove the shim so the role
+    # is tested against that behaviour.
+    - name: Allow package installs to start services (Debian/Ubuntu)
+      ansible.builtin.file:
+        path: /usr/sbin/policy-rc.d
+        state: absent
+      when: ansible_facts['os_family'] == 'Debian'
+
     - name: Install iproute2 + openssl (Debian/Ubuntu)
       ansible.builtin.package:
         name:
           - iproute2
           - openssl
         state: present
-      when: ansible_os_family == 'Debian'
+      when: ansible_facts['os_family'] == 'Debian'
 
-    - name: Ensure certs directory exists
-      ansible.builtin.file:
-        path: /etc/haproxy/certs
-        state: directory
-        mode: "0750"
-
+    # The role deploys the certificate from the controller
+    # (haproxy_ssl_cert_src), so generate it on the target and fetch it.
     - name: Generate a self-signed PEM for HAProxy
       ansible.builtin.shell: |
         set -o pipefail
-        openssl req -x509 -newkey rsa:2048 -nodes -keyout /tmp/k.pem -out /tmp/c.pem \
+        mkdir -p /root/hkv-ssl
+        openssl req -x509 -newkey rsa:2048 -nodes -keyout /root/hkv-ssl/k.pem -out /root/hkv-ssl/c.pem \
           -days 1 -subj "/CN=test.local" 2>/dev/null
-        cat /tmp/c.pem /tmp/k.pem > /etc/haproxy/certs/test.pem
-        chmod 0640 /etc/haproxy/certs/test.pem
+        cat /root/hkv-ssl/c.pem /root/hkv-ssl/k.pem > /root/hkv-ssl/test.pem
       args:
         executable: /bin/bash
-        creates: /etc/haproxy/certs/test.pem
+        creates: /root/hkv-ssl/test.pem
+
+    - name: Fetch the PEM into the controller-side certificate directory
+      ansible.builtin.fetch:
+        src: /root/hkv-ssl/test.pem
+        dest: "{{ lookup('env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/certs/test.pem"
+        flat: true
