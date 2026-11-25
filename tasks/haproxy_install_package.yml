@@ -1,6 +1,16 @@
 ---
 # Downloaded once: the keyserver reorders the armor headers on every request,
-# so handing the URL to signed_by would rewrite the key on every run.
+# so handing the URL to signed_by would rewrite the key on every run. get_url
+# with force: false still re-requests an existing file (If-Modified-Since,
+# which the keyserver ignores), so the download is skipped when it exists.
+- name: Check for the vbernat PPA signing key (Ubuntu)
+  ansible.builtin.stat:
+    path: /etc/apt/keyrings/haproxy-vbernat-ppa.asc
+  register: haproxy_ppa_key
+  when:
+    - ansible_facts['distribution'] == 'Ubuntu'
+    - haproxy_branch | length > 0
+
 - name: Download the vbernat PPA signing key (Ubuntu)
   ansible.builtin.get_url:
     # Launchpad signing_key_fingerprint of the vbernat PPAs.
@@ -13,6 +23,7 @@
   when:
     - ansible_facts['distribution'] == 'Ubuntu'
     - haproxy_branch | length > 0
+    - not haproxy_ppa_key.stat.exists
 
 - name: Add vbernat HAProxy PPA (Ubuntu, branch pinned)
   ansible.builtin.deb822_repository:
