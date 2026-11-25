@@ -80,8 +80,9 @@
     daemon_reload: true
   register: keepalived_service_start
 
-# A unit drop-in change needs a restart; a config, notify script or credentials
-# change only needs a reload (keepalived reads notify scripts at exec time).
+# A unit drop-in change or a new source-built binary needs a restart; a config,
+# notify script or credentials change only needs a reload (keepalived reads
+# notify scripts at exec time).
 # Skipped when the task above just started the service with the new files:
 # keyed on the state it found (status is read before acting), because that
 # task also reports changed when it only enabled a running unit. One host at a
@@ -94,11 +95,16 @@
       or keepalived_dropin_result is changed
       or (keepalived_env_result | default({})) is changed
       or (keepalived_notify_script_result | default({})) is changed
+      or keepalived_source_changed | default(false) | bool
     - keepalived_service_start.status.ActiveState | default('') in ['active', 'activating']
   ansible.builtin.systemd_service:
     name: keepalived
     daemon_reload: true
-    state: "{{ 'restarted' if keepalived_dropin_result is changed else 'reloaded' }}"
+    state: >-
+      {{ 'restarted'
+         if keepalived_dropin_result is changed
+            or keepalived_source_changed | default(false) | bool
+         else 'reloaded' }}
   throttle: 1
 
 - name: Wait for Keepalived to initialize

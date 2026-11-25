@@ -22,6 +22,11 @@
       {{ (installed_keepalived_version | default('') | length == 0)
          or (installed_keepalived_version is version(keepalived_version, '!=')) }}
 
+# Reset on every role run, like haproxy_source_changed.
+- name: Reset the Keepalived binary change flag
+  ansible.builtin.set_fact:
+    keepalived_source_changed: false
+
 - name: Install Keepalived from source if required
   when: keepalived_installation_required
   block:
@@ -101,6 +106,12 @@
         chdir: "{{ haproxy_install_dir }}/keepalived-{{ keepalived_version }}"
       register: keepalived_install
       changed_when: keepalived_install.rc == 0
+
+    # Consumed by "Apply Keepalived configuration change" in keepalived.yml so
+    # a running Keepalived is restarted onto the new binary in the same play.
+    - name: Flag Keepalived binary change for restart
+      ansible.builtin.set_fact:
+        keepalived_source_changed: "{{ keepalived_install is changed }}"
 
     - name: Check generated keepalived.service exists
       ansible.builtin.stat:

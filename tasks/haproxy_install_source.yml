@@ -25,6 +25,12 @@
       {{ (installed_haproxy_version | default('') | length == 0)
          or (installed_haproxy_version is version(haproxy_version, '!=')) }}
 
+# Reset on every role run, so a later application of the role in the same
+# playbook does not restart HAProxy again for an install it did not do.
+- name: Reset the HAProxy binary change flag
+  ansible.builtin.set_fact:
+    haproxy_source_changed: false
+
 - name: Install HAProxy from source if required
   when: haproxy_installation_required
   block:
