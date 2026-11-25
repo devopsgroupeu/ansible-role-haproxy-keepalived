@@ -450,11 +450,11 @@ curl -u admin:<password> http://127.0.0.1:1936/haproxy/stats
 
 ## Contributing
 
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) to get started.
+We welcome contributions! Please see [CONTRIBUTING.md](.github/CONTRIBUTING.md) to get started.
 
 ## Code of Conduct
 
-Read our [Code of Conduct](CODE_OF_CONDUCT.md).
+Read our [Code of Conduct](.github/CODE_OF_CONDUCT.md).
 
 ## Changelog
 
