@@ -118,8 +118,10 @@
 # auto-starts HAProxy on the default config, and a soft reload over that
 # process can leave the new frontends unbound (no listening sockets); a new
 # source-built binary also restarts. Skipped when the task above just started
-# the service, because it already runs the new config and binary. One host at a
-# time, so both load balancers never drop connections in the same second.
+# the service, because it already runs the new config and binary: keyed on the
+# state it found (status is read before acting), because that task also reports
+# changed when it only enabled a running unit. One host at a time, so both load
+# balancers never drop connections in the same second.
 - name: Apply HAProxy configuration change
   ansible.builtin.systemd_service:
     name: haproxy
@@ -136,7 +138,7 @@
       haproxy_config_result is changed
       or haproxy_cert_result is changed
       or haproxy_source_changed | default(false) | bool
-    - haproxy_service_start is not changed
+    - haproxy_service_start.status.ActiveState | default('') in ['active', 'activating']
 
 # Probe the stats listener where it is bound: loopback for wildcard binds,
 # otherwise the configured address (bracketed in the URL when IPv6).
