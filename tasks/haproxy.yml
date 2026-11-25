@@ -94,14 +94,24 @@
     src: haproxy-rsyslog.conf.j2
     dest: "/etc/rsyslog.d/haproxy.conf"
     mode: "0644"
-  notify: Restart rsyslog
+  register: haproxy_rsyslog_result
 
 - name: Remove rsyslog HAProxy config when logging via journald
   when: haproxy_journald | bool
   ansible.builtin.file:
     path: /etc/rsyslog.d/haproxy.conf
     state: absent
-  notify: Restart rsyslog
+  register: haproxy_rsyslog_removed
+
+# In-play, not a deferred handler: a failed readiness check below would drop
+# the handler and the rerun would never re-notify it, leaving rsyslog without
+# the UDP receiver.
+- name: Restart rsyslog after an HAProxy rule change
+  when: haproxy_rsyslog_result is changed or haproxy_rsyslog_removed is changed
+  ansible.builtin.systemd_service:
+    name: rsyslog
+    state: restarted
+    enabled: true
 
 - name: Ensure HAProxy service is running
   ansible.builtin.systemd_service:
